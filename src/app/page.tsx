@@ -123,16 +123,29 @@ export default async function DashboardPage() {
             label={`Verlof in ${formatMonthNl(`${currentMonth}-01`)}`}
             value={`${formatHoursNumber(impact.leaveHours)} uur`}
           />
-          <Stat
-            label="Verwacht bruto deze maand"
-            value={formatEuro(impact.totalReceived)}
-            hint={
-              impact.difference < -0.005
-                ? `${formatEuro(Math.abs(impact.difference))} minder dan normaal`
-                : "Geen inkomensverlies"
-            }
-            tone={impact.difference < -0.005 ? "negative" : "neutral"}
-          />
+          {impact.net ? (
+            <Stat
+              label="Verwacht netto deze maand"
+              value={formatEuro(impact.net.actual.netPayout)}
+              hint={
+                impact.net.netDifference < -0.005
+                  ? `${formatEuro(Math.abs(impact.net.netDifference))} minder dan normaal`
+                  : "Geen inkomensverlies"
+              }
+              tone={impact.net.netDifference < -0.005 ? "negative" : "neutral"}
+            />
+          ) : (
+            <Stat
+              label="Verwacht bruto deze maand"
+              value={formatEuro(impact.totalReceived)}
+              hint={
+                impact.difference < -0.005
+                  ? `${formatEuro(Math.abs(impact.difference))} minder dan normaal`
+                  : "Geen inkomensverlies"
+              }
+              tone={impact.difference < -0.005 ? "negative" : "neutral"}
+            />
+          )}
           <Stat
             label="Melden vóór de 15e"
             value={
