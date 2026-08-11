@@ -167,6 +167,27 @@ export function weekdaysOf(weekStart: DateOnly): DateOnly[] {
   return Array.from({ length: 7 }, (_, index) => addDaysOnly(monday, index));
 }
 
+/**
+ * De weken van een maandkalender: rijen van zeven dagen, van maandag tot en met
+ * zondag. De eerste en laatste rij lopen door in de vorige respectievelijk
+ * volgende maand, zodat elke rij compleet is.
+ */
+export function calendarWeeksOf(month: string): DateOnly[][] {
+  const first = startOfMonth(`${month}-01`);
+  const last = endOfMonth(first);
+
+  const weeks: DateOnly[][] = [];
+  let cursor = startOfIsoWeek(first);
+
+  // De laatste rij is die waarin de laatste dag van de maand valt.
+  const lastRowStart = startOfIsoWeek(last);
+  while (cursor <= lastRowStart) {
+    weeks.push(weekdaysOf(cursor));
+    cursor = addDaysOnly(cursor, 7);
+  }
+  return weeks;
+}
+
 export function shiftIsoWeek(key: IsoWeekKey, weeks: number): IsoWeekKey {
   const { start } = parseIsoWeekKey(key);
   return isoWeekKey(addWeeksOnly(start, weeks));

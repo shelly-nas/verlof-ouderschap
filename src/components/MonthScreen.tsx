@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { MonthGrid } from "@/components/MonthGrid";
+import { MonthCalendar } from "@/components/MonthCalendar";
 import { Badge } from "@/components/ui";
 import { balancesFor } from "@/lib/balances";
 import { contractForDate, hoursPerWorkday } from "@/lib/contracts";
@@ -29,8 +29,7 @@ export async function MonthScreen({ month: maand }: { month: string }) {
 
   const now = today();
 
-  // Alle kalenderdagen van de maand, met per dag het contract dat er geldt.
-  const days: DateOnly[] = [];
+  // Per dag het contract dat er geldt; de kalender leidt daar het rooster uit af.
   const hoursPerWorkdayByDate: Record<string, number> = {};
   const contractsInMonth = new Map<string, { name: string; hours: number }>();
   let daysWithoutContract = 0;
@@ -38,8 +37,6 @@ export async function MonthScreen({ month: maand }: { month: string }) {
   const lastDay = Number(monthEnd.slice(8, 10));
   for (let day = 1; day <= lastDay; day += 1) {
     const date = `${maand}-${`${day}`.padStart(2, "0")}` as DateOnly;
-    days.push(date);
-
     const contract = contractForDate(contracts, date);
     if (contract) {
       hoursPerWorkdayByDate[date] = hoursPerWorkday(contract);
@@ -110,10 +107,10 @@ export async function MonthScreen({ month: maand }: { month: string }) {
         </div>
       </div>
 
-      <MonthGrid
+      <MonthCalendar
         key={maand}
         month={maand}
-        days={days}
+        today={now}
         entries={monthEntries}
         kinderen={children}
         leaveTypes={leaveTypes}
@@ -129,10 +126,6 @@ export async function MonthScreen({ month: maand }: { month: string }) {
           binnen de maand.
         </p>
       )}
-
-      <p className="text-sm text-[var(--muted)]">
-        Het weekend blijft verborgen zolang er geen verlof op staat.
-      </p>
     </div>
   );
 }

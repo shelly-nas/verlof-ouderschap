@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   addDaysOnly,
+  calendarWeeksOf,
   daysBetween,
   endOfMonth,
   formatDateOnly,
@@ -79,6 +80,49 @@ describe("ISO-weken", () => {
     expect(days).toHaveLength(7);
     expect(days[0]).toBe("2026-02-09");
     expect(days[6]).toBe("2026-02-15");
+  });
+});
+
+describe("kalenderweken", () => {
+  it("bouwt volledige weken van maandag tot en met zondag", () => {
+    const weeks = calendarWeeksOf("2026-08");
+    for (const week of weeks) {
+      expect(week).toHaveLength(7);
+      expect(parseDateOnly(week[0]).getUTCDay()).toBe(1); // maandag
+      expect(parseDateOnly(week[6]).getUTCDay()).toBe(0); // zondag
+    }
+  });
+
+  it("laat de eerste rij in de vorige maand beginnen", () => {
+    // 1 augustus 2026 is een zaterdag; de rij begint op maandag 27 juli.
+    const weeks = calendarWeeksOf("2026-08");
+    expect(weeks[0][0]).toBe("2026-07-27");
+    expect(weeks[0][5]).toBe("2026-08-01");
+  });
+
+  it("laat de laatste rij in de volgende maand eindigen", () => {
+    // 31 augustus 2026 is een maandag; die rij loopt door tot 6 september.
+    const weeks = calendarWeeksOf("2026-08");
+    const lastWeek = weeks[weeks.length - 1];
+    expect(lastWeek[0]).toBe("2026-08-31");
+    expect(lastWeek[6]).toBe("2026-09-06");
+  });
+
+  it("bevat elke dag van de maand precies één keer", () => {
+    for (const month of ["2026-01", "2026-02", "2026-08", "2028-02", "2026-12"]) {
+      const days = calendarWeeksOf(month).flat().filter((d) => d.startsWith(month));
+      const expected = Number(endOfMonth(`${month}-01`).slice(8, 10));
+      expect(days).toHaveLength(expected);
+      expect(new Set(days).size).toBe(expected);
+    }
+  });
+
+  it("werkt voor een maand die precies op maandag begint en op zondag eindigt", () => {
+    // Februari 2027: 1 februari is maandag, 28 februari is zondag.
+    const weeks = calendarWeeksOf("2027-02");
+    expect(weeks).toHaveLength(4);
+    expect(weeks[0][0]).toBe("2027-02-01");
+    expect(weeks[3][6]).toBe("2027-02-28");
   });
 });
 

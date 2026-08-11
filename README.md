@@ -114,11 +114,13 @@ blijft het bij een bruto-indicatie.
 
 - **Overzicht** — resterend verlof, inkomen deze maand, en hoeveel dagen je nog
   hebt om vóór de 15e je melding te versturen.
-- **Maand invoeren** — het kernscherm. Alle werkdagen van de maand onder elkaar,
-  gegroepeerd per week. Per dag vul je uren, verlofsoort en kind in. "Hele maand
-  vullen", "Vorige maand kopiëren" en de knoppen ma/di/wo/do/vr (vult die weekdag
-  de hele maand) schelen typewerk. Opslaan gebeurt als één transactie: de
-  opgeslagen maand is altijd exact wat je op het scherm ziet.
+- **Maand invoeren** — het kernscherm: een maandkalender. Kies bovenaan een
+  verlofsoort en klik op een dag om er een volledige verlofdag neer te zetten;
+  nog een klik haalt hem weg. Klik op het urenbedrag in een dag voor afwijkende
+  uren of een tweede verlofsoort op diezelfde dag. "Hele maand", "Vorige maand
+  kopiëren" en de knoppen ma/di/wo/do/vr (vult die weekdag de hele maand) schelen
+  typewerk. Opslaan gebeurt als één transactie: de opgeslagen maand is altijd
+  exact wat je op het scherm ziet.
 - **Saldo** — per kind per verlofsoort: recht, opgenomen, restant, deadline.
 - **Salaris** — de loonstrook van een maand met verlof naast een normale maand,
   bruto én netto.
