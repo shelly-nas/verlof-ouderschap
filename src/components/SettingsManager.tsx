@@ -126,10 +126,6 @@ export function SettingsManager({ leaveTypes }: { leaveTypes: LeaveTypeDto[] }) 
                 defaultValue="#0ea5e9"
               />
             </Field>
-            <label className="flex items-center gap-2 self-end pb-2 text-sm sm:col-span-2">
-              <input type="checkbox" name="cappedAtMaxDagloon" className="h-4 w-4" />
-              Uitkering maximeren op het maximumdagloon
-            </label>
             <div className="sm:col-span-3">
               <button
                 type="submit"
@@ -230,15 +226,6 @@ export function SettingsManager({ leaveTypes }: { leaveTypes: LeaveTypeDto[] }) 
                         defaultValue={leaveType.deadlineValue ?? ""}
                       />
                     </Field>
-                    <label className="flex items-center gap-2 self-end pb-2 text-sm">
-                      <input
-                        type="checkbox"
-                        name="cappedAtMaxDagloon"
-                        defaultChecked={leaveType.cappedAtMaxDagloon}
-                        className="h-4 w-4"
-                      />
-                      Maximeren op maximumdagloon
-                    </label>
                   </>
                 )}
 
@@ -283,7 +270,6 @@ export function SettingsManager({ leaveTypes }: { leaveTypes: LeaveTypeDto[] }) 
                     {leaveType.weeksMultiplier} × weekuren ·{" "}
                     {payerLabels[leaveType.payer]}
                     {leaveType.payPercent !== null && ` ${leaveType.payPercent}%`}
-                    {leaveType.cappedAtMaxDagloon && " (gemaximeerd)"}
                     {leaveType.deadlineAnchor !== "NONE" &&
                       ` · ${leaveType.deadlineValue} ${anchorLabels[leaveType.deadlineAnchor]}`}
                   </p>

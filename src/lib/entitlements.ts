@@ -21,7 +21,6 @@ export type LeaveTypeLike = {
   weeksMultiplier: number;
   payer: "EMPLOYER" | "UWV" | "UNPAID";
   payPercent: number | null;
-  cappedAtMaxDagloon: boolean;
   deadlineAnchor: DeadlineAnchor;
   deadlineValue: number | null;
   fallbackLeaveTypeId: string | null;
@@ -39,7 +38,6 @@ export type SupplementLike = {
   contractId: string;
   leaveTypeId: string;
   topUpToPercent: number | null;
-  topUpUncapped: boolean;
   extraWeeks: number | null;
   deadlineOverrideMonths: number | null;
 };
@@ -91,7 +89,6 @@ export type Entitlement = {
   payer: LeaveTypeLike["payer"];
   payPercent: number | null;
   topUpToPercent: number | null;
-  topUpUncapped: boolean;
 };
 
 export function findSupplement(
@@ -157,7 +154,6 @@ export function entitlementFor(
     payer: leaveType.payer,
     payPercent: leaveType.payPercent,
     topUpToPercent: supplement?.topUpToPercent ?? null,
-    topUpUncapped: supplement?.topUpUncapped ?? true,
   };
 }
 

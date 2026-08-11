@@ -16,8 +16,7 @@ import { monthImpact } from "@/lib/salary";
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const { contracts, children, leaveTypes, supplements, entries, maxDaglonen } =
-    await getAppData();
+  const { contracts, children, leaveTypes, supplements, entries } = await getAppData();
   const now = today();
   const contract = activeContract(contracts, now);
 
@@ -66,7 +65,6 @@ export default async function DashboardPage() {
       contracts,
       leaveTypes,
       supplements,
-      maxDaglonen,
     });
   } catch {
     impact = null;
@@ -81,6 +79,9 @@ export default async function DashboardPage() {
   const withRemaining = balances.filter((balance) => balance.remainingHours > 0);
   const daysLeft = daysUntilDeadline(now);
   const reportingMonth = reportingMonthFor(now);
+
+  // Netto als het contract loonstrookgegevens heeft, anders bruto.
+  const netDifference = impact?.net ? impact.net.netDifference : (impact?.difference ?? 0);
 
   return (
     <div className="flex flex-col gap-5">
@@ -118,34 +119,34 @@ export default async function DashboardPage() {
       )}
 
       {impact && (
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Wat het verlof kost is het getal waar het om draait, dus dat staat
+              vooraan en als hoofdbedrag — niet als bijtekst. */}
+          <Stat
+            label="Netto minder deze maand"
+            value={formatEuro(Math.abs(netDifference))}
+            hint={
+              netDifference < -0.005
+                ? `${formatHoursNumber(impact.leaveHours)} uur verlof`
+                : "Geen inkomensverlies"
+            }
+            tone={netDifference < -0.005 ? "negative" : "neutral"}
+          />
+          <Stat
+            label={impact.net ? "Verwacht netto deze maand" : "Verwacht bruto deze maand"}
+            value={formatEuro(
+              impact.net ? impact.net.actual.netPayout : impact.totalReceived,
+            )}
+            hint={
+              impact.net
+                ? `Normaal ${formatEuro(impact.net.normal.netPayout)}`
+                : `Normaal ${formatEuro(impact.normalGross)}`
+            }
+          />
           <Stat
             label={`Verlof in ${formatMonthNl(`${currentMonth}-01`)}`}
             value={`${formatHoursNumber(impact.leaveHours)} uur`}
           />
-          {impact.net ? (
-            <Stat
-              label="Verwacht netto deze maand"
-              value={formatEuro(impact.net.actual.netPayout)}
-              hint={
-                impact.net.netDifference < -0.005
-                  ? `${formatEuro(Math.abs(impact.net.netDifference))} minder dan normaal`
-                  : "Geen inkomensverlies"
-              }
-              tone={impact.net.netDifference < -0.005 ? "negative" : "neutral"}
-            />
-          ) : (
-            <Stat
-              label="Verwacht bruto deze maand"
-              value={formatEuro(impact.totalReceived)}
-              hint={
-                impact.difference < -0.005
-                  ? `${formatEuro(Math.abs(impact.difference))} minder dan normaal`
-                  : "Geen inkomensverlies"
-              }
-              tone={impact.difference < -0.005 ? "negative" : "neutral"}
-            />
-          )}
           <Stat
             label="Melden vóór de 15e"
             value={

@@ -363,15 +363,6 @@ export function ContractForm({
                       />
                     </Field>
                   </div>
-                  <label className="mt-3 flex items-center gap-2 text-sm">
-                    <input
-                      type="checkbox"
-                      name={`topUpUncapped_${leaveType.id}`}
-                      defaultChecked={supplement?.topUpUncapped ?? true}
-                      className="h-4 w-4"
-                    />
-                    Aanvulling over het volledige dagloon (ook boven het maximumdagloon)
-                  </label>
                   <Field label="Notitie" className="mt-3">
                     <input
                       name={`supplementNotes_${leaveType.id}`}

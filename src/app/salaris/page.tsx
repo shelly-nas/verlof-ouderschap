@@ -16,7 +16,7 @@ export default async function SalarisPage({
   const now = today();
   const month = /^\d{4}-\d{2}$/.test(maand ?? "") ? maand! : monthKey(now);
 
-  const { contracts, leaveTypes, supplements, entries, maxDaglonen } = await getAppData();
+  const { contracts, leaveTypes, supplements, entries } = await getAppData();
 
   if (contracts.length === 0) {
     return (
@@ -42,7 +42,6 @@ export default async function SalarisPage({
       contracts,
       leaveTypes,
       supplements,
-      maxDaglonen,
     });
   } catch (caught) {
     error = caught instanceof Error ? caught.message : String(caught);
@@ -127,11 +126,7 @@ export default async function SalarisPage({
                 <Stat
                   label="Waarvan UWV"
                   value={formatEuro(impact.uwvBenefit)}
-                  hint={
-                    impact.cappedByMaxDagloon
-                      ? "Gemaximeerd op het maximumdagloon"
-                      : "70% van je dagloon"
-                  }
+                  hint="70% van je dagloon"
                 />
               </>
             ) : (
@@ -159,23 +154,11 @@ export default async function SalarisPage({
                 <Stat
                   label="Waarvan UWV"
                   value={formatEuro(impact.uwvBenefit)}
-                  hint={
-                    impact.cappedByMaxDagloon
-                      ? "Gemaximeerd op het maximumdagloon"
-                      : "70% van je dagloon"
-                  }
+                  hint="70% van je dagloon"
                 />
               </>
             )}
           </div>
-
-          {impact.cappedByMaxDagloon && (
-            <Alert tone="info" title="Je uitkering is gemaximeerd">
-              Je dagloon ligt boven het wettelijk maximumdagloon. UWV rekent 70% over dat
-              maximum, niet over je eigen loon — je ontvangt dus effectief minder dan 70%
-              van je salaris.
-            </Alert>
-          )}
 
           {impact.lines.length === 0 ? (
             <EmptyState title="Geen verlof in deze maand">
@@ -208,11 +191,6 @@ export default async function SalarisPage({
                       >
                         <td className="py-2">
                           {line.leaveTypeName}
-                          {line.cappedByMaxDagloon && (
-                            <span className="ml-2 text-xs text-[var(--muted)]">
-                              (gemaximeerd)
-                            </span>
-                          )}
                         </td>
                         <td className="py-2 text-right tabular-nums">
                           {formatHoursNumber(line.hours)}

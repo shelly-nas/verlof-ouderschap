@@ -63,11 +63,7 @@ Alle rechten gelden per kind en worden berekend als
 
 Enkele regels die in de berekening verwerkt zitten:
 
-- **Maximumdagloon.** UWV keert 70% uit over je dagloon, maar nooit over meer dan
-  het maximumdagloon (€309,91 vanaf 1-1-2026). Bij een hoger salaris ontvang je
-  dus effectief minder dan 70%. Het bedrag wordt opgezocht bij de datum van de
-  verlofdag zelf; onder Instellingen zie je welke bedragen bekend zijn. Een nieuw
-  bedrag voeg je toe in `prisma/seed.ts` en laad je met `npm run db:seed`.
+- **UWV-uitkering** = 70% van je dagloon.
 - **Dagloon** = bruto maandsalaris ÷ 21,75.
 - **Doorschuiven.** Ouderschapsverlof is wettelijk één pot van 26 weken waarvan er
   9 betaald zijn. Neem je die betaalde weken niet op vóór de eerste verjaardag,
@@ -141,7 +137,7 @@ npm run db:studio     # database inspecteren
 De rekenkern in [`src/lib/`](src/lib/) is bewust vrij van framework-code en
 volledig getest: `dates.ts` (ISO-weken, kalenderdagen), `contracts.ts`,
 `entitlements.ts` (recht en deadlines), `balances.ts` (saldo en doorschuiven),
-`dagloon.ts` (uitkering en maximumdagloon), `loonheffing.ts` (schijven en
+`dagloon.ts` (dagloon en uitkering), `loonheffing.ts` (schijven en
 heffingskortingen), `netsalary.ts` (de loonstrook), `salary.ts` en `mailto.ts`.
 
 Datums worden overal als `yyyy-MM-dd`-string behandeld en in Postgres als `date`

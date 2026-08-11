@@ -1,6 +1,6 @@
 import type { ContractLike } from "./contracts";
 import { contractForDate } from "./contracts";
-import { type MaxDagloonRow, dayRate, hoursToDayEquivalent } from "./dagloon";
+import { dayRate, hoursToDayEquivalent } from "./dagloon";
 import { type DateOnly, endOfMonth, startOfMonth } from "./dates";
 import type { LeaveTypeLike, SupplementLike } from "./entitlements";
 import { findSupplement } from "./entitlements";
@@ -17,7 +17,6 @@ export type SalaryLineItem = {
   employerTopUp: number;
   received: number;
   loss: number;
-  cappedByMaxDagloon: boolean;
 };
 
 export type MonthImpact = {
@@ -37,7 +36,6 @@ export type MonthImpact = {
   difference: number;
   leaveHours: number;
   leaveDayEquivalents: number;
-  cappedByMaxDagloon: boolean;
   lines: SalaryLineItem[];
   /** Dagen in deze maand zonder geldig contract, met verlof geboekt. */
   entriesWithoutContract: number;
@@ -54,8 +52,7 @@ export type MonthImpact = {
  *
  * Elke verlofdag rekent met het contract dat op díe dag gold, niet met het
  * contract dat vandaag actief is — anders klopt een maand waarin je van
- * werkgever wisselt niet. Het maximumdagloon wordt eveneens per dag opgezocht,
- * want dat wijzigt op 1 januari en 1 juli.
+ * werkgever wisselt niet.
  *
  * Dit is een bruto-indicatie: loonheffing, vakantiegeld en pensioenpremies
  * blijven buiten beschouwing.
@@ -66,9 +63,8 @@ export function monthImpact(params: {
   contracts: readonly SalaryContract[];
   leaveTypes: readonly LeaveTypeLike[];
   supplements: readonly SupplementLike[];
-  maxDaglonen: readonly MaxDagloonRow[];
 }): MonthImpact {
-  const { month, contracts, leaveTypes, supplements, maxDaglonen } = params;
+  const { month, contracts, leaveTypes, supplements } = params;
   const monthStart = startOfMonth(`${month}-01`);
   const monthEnd = endOfMonth(monthStart);
 
@@ -85,7 +81,6 @@ export function monthImpact(params: {
   let leaveHours = 0;
   let leaveDayEquivalents = 0;
   let normalGrossForLeaveDays = 0;
-  let cappedByMaxDagloon = false;
   let entriesWithoutContract = 0;
 
   for (const entry of entries) {
@@ -104,10 +99,7 @@ export function monthImpact(params: {
       grossMonthlySalary: contract.grossMonthlySalary,
       payer: leaveType.payer,
       payPercent: leaveType.payPercent,
-      cappedAtMaxDagloon: leaveType.cappedAtMaxDagloon,
-      maxDaglonen,
       topUpToPercent: supplement?.topUpToPercent ?? null,
-      topUpUncapped: supplement?.topUpUncapped ?? true,
     });
 
     const days = hoursToDayEquivalent(entry.hours, contract.hoursPerWeek);
@@ -123,7 +115,6 @@ export function monthImpact(params: {
     leaveHours += entry.hours;
     leaveDayEquivalents += days;
     normalGrossForLeaveDays += entryNormal;
-    cappedByMaxDagloon = cappedByMaxDagloon || rate.cappedByMaxDagloon;
 
     const existing = lineByType.get(leaveType.id) ?? {
       leaveTypeId: leaveType.id,
@@ -135,7 +126,6 @@ export function monthImpact(params: {
       employerTopUp: 0,
       received: 0,
       loss: 0,
-      cappedByMaxDagloon: false,
     };
     existing.hours += entry.hours;
     existing.dayEquivalents += days;
@@ -144,7 +134,6 @@ export function monthImpact(params: {
     existing.employerTopUp += entryTopUp;
     existing.received += entryEmployer + entryUwv + entryTopUp;
     existing.loss += Math.max(0, entryNormal - (entryEmployer + entryUwv + entryTopUp));
-    existing.cappedByMaxDagloon = existing.cappedByMaxDagloon || rate.cappedByMaxDagloon;
     lineByType.set(leaveType.id, existing);
   }
 
@@ -177,7 +166,6 @@ export function monthImpact(params: {
     difference: totalReceived - normalGross,
     leaveHours,
     leaveDayEquivalents,
-    cappedByMaxDagloon,
     lines: [...lineByType.values()].sort((a, b) =>
       a.leaveTypeName.localeCompare(b.leaveTypeName),
     ),

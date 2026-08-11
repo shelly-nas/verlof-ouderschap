@@ -20,13 +20,12 @@ const prisma = new PrismaClient({
 const d = (iso: string) => new Date(`${iso}T00:00:00.000Z`);
 
 async function load() {
-  const [contractRows, childRows, typeRows, supplementRows, maxRows, entryRows] =
+  const [contractRows, childRows, typeRows, supplementRows, entryRows] =
     await Promise.all([
       prisma.contract.findMany(),
       prisma.child.findMany(),
       prisma.leaveType.findMany(),
       prisma.employerSupplement.findMany(),
-      prisma.maxDagloon.findMany(),
       prisma.leaveEntry.findMany(),
     ]);
 
@@ -52,7 +51,6 @@ async function load() {
       weeksMultiplier: toNumber(row.weeksMultiplier),
       payer: row.payer,
       payPercent: toNumberOrNull(row.payPercent),
-      cappedAtMaxDagloon: row.cappedAtMaxDagloon,
       deadlineAnchor: row.deadlineAnchor,
       deadlineValue: row.deadlineValue,
       fallbackLeaveTypeId: row.fallbackLeaveTypeId,
@@ -63,13 +61,8 @@ async function load() {
       contractId: row.contractId,
       leaveTypeId: row.leaveTypeId,
       topUpToPercent: toNumberOrNull(row.topUpToPercent),
-      topUpUncapped: row.topUpUncapped,
       extraWeeks: toNumberOrNull(row.extraWeeks),
       deadlineOverrideMonths: row.deadlineOverrideMonths,
-    })),
-    maxDaglonen: maxRows.map((row) => ({
-      validFrom: formatDateOnly(row.validFrom),
-      amount: toNumber(row.amount),
     })),
     entries: entryRows.map((row) => ({
       id: row.id,
@@ -149,7 +142,6 @@ async function main() {
       contractId: contractA.id,
       leaveTypeId: aanvullend.id,
       topUpToPercent: "100",
-      topUpUncapped: true,
     },
   });
   data = await load();
@@ -160,28 +152,6 @@ async function main() {
     true,
   );
   await prisma.employerSupplement.deleteMany();
-
-  console.log("\n== Stap 7: maximumdagloon verschilt per periode ==");
-  const hoogSalaris = { ...contractA, grossMonthlySalary: 9000, endDate: null };
-  const juni2025 = monthImpact({
-    ...data,
-    month: "2025-06",
-    contracts: [hoogSalaris],
-    entries: [
-      { id: "x", date: "2025-06-02", hours: 8, childId: child.id, leaveTypeId: aanvullend.id },
-    ],
-  });
-  const juli2025 = monthImpact({
-    ...data,
-    month: "2025-07",
-    contracts: [hoogSalaris],
-    entries: [
-      { id: "y", date: "2025-07-01", hours: 8, childId: child.id, leaveTypeId: aanvullend.id },
-    ],
-  });
-  check("juni 2025 gebruikt maximumdagloon 290,67", Math.round(juni2025.uwvBenefit * 100) / 100, Math.round(0.7 * 290.67 * 100) / 100);
-  check("juli 2025 gebruikt maximumdagloon 297,82", Math.round(juli2025.uwvBenefit * 100) / 100, Math.round(0.7 * 297.82 * 100) / 100);
-  check("gecapt wordt gemeld", juni2025.cappedByMaxDagloon, true);
 
   console.log("\n== Doorschuifregel betaald -> onbetaald OV ==");
   await prisma.leaveEntry.deleteMany();

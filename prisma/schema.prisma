@@ -75,8 +75,6 @@ model EmployerSupplement {
 
   /// Werkgever vult aan tot dit percentage van het dagloon (bv. 100).
   topUpToPercent Decimal? @db.Decimal(5, 2)
-  /// Aanvulling berekend over het eigen dagloon i.p.v. het gecapte UWV-dagloon.
-  topUpUncapped  Boolean  @default(true)
   /// Extra weken bovenop de wettelijke weeksMultiplier.
   extraWeeks     Decimal? @db.Decimal(5, 2)
   /// Ruimere opnametermijn dan wettelijk, in maanden na geboorte.
@@ -109,7 +107,6 @@ model LeaveType {
   weeksMultiplier    Decimal        @db.Decimal(5, 2)
   payer              PayerKind
   payPercent         Decimal?       @db.Decimal(5, 2)
-  cappedAtMaxDagloon Boolean        @default(false)
   deadlineAnchor     DeadlineAnchor
   deadlineValue      Int?
 
@@ -155,17 +152,4 @@ model LeaveEntry {
   @@index([childId, leaveTypeId])
   @@index([contractId])
   @@index([leaveTypeId])
-}
-
-/// UWV-maximumdagloon, wijzigt elke 1 januari en 1 juli. Seed-data, aanpasbaar
-/// via de UI zodat een nieuwe halfjaarwaarde geen deploy vergt.
-model MaxDagloon {
-  id        String   @id @default(cuid())
-  validFrom DateTime @unique @db.Date
-  amount    Decimal  @db.Decimal(8, 2)
-  source    String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([validFrom])
 }

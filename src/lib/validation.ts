@@ -44,7 +44,6 @@ export const supplementSchema = z.object({
     (value) => value === null || (value >= 0 && value <= 200),
     "Aanvulling moet tussen 0% en 200% liggen",
   ),
-  topUpUncapped: z.boolean().default(true),
   extraWeeks: optionalNumber.refine(
     (value) => value === null || (value >= 0 && value <= 104),
     "Extra weken moet tussen 0 en 104 liggen",
@@ -135,8 +134,7 @@ export const leaveTypeSchema = z
       (value) => value === null || (value >= 0 && value <= 100),
       "Percentage moet tussen 0 en 100 liggen",
     ),
-    cappedAtMaxDagloon: z.boolean().default(false),
-    deadlineAnchor: z.enum([
+      deadlineAnchor: z.enum([
       "WEEKS_AFTER_BIRTH",
       "MONTHS_AFTER_BIRTH",
       "YEARS_AFTER_BIRTH",

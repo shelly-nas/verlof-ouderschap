@@ -1,15 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { LeaveEntryLike } from "./balances";
 import type { ContractLike } from "./contracts";
-import type { MaxDagloonRow } from "./dagloon";
 import type { LeaveTypeLike, SupplementLike } from "./entitlements";
 import { monthImpact, normalGrossForMonth } from "./salary";
-
-const MAX_DAGLONEN: MaxDagloonRow[] = [
-  { validFrom: "2025-01-01", amount: 290.67 },
-  { validFrom: "2025-07-01", amount: 297.82 },
-  { validFrom: "2026-01-01", amount: 309.91 },
-];
 
 const contractA: ContractLike = {
   id: "a",
@@ -38,7 +31,6 @@ const betaaldOv: LeaveTypeLike = {
   weeksMultiplier: 9,
   payer: "UWV",
   payPercent: 70,
-  cappedAtMaxDagloon: true,
   deadlineAnchor: "YEARS_AFTER_BIRTH",
   deadlineValue: 1,
   fallbackLeaveTypeId: null,
@@ -53,7 +45,6 @@ const geboorteverlof: LeaveTypeLike = {
   weeksMultiplier: 1,
   payer: "EMPLOYER",
   payPercent: 100,
-  cappedAtMaxDagloon: false,
   deadlineAnchor: "WEEKS_AFTER_BIRTH",
   deadlineValue: 4,
   fallbackLeaveTypeId: null,
@@ -68,7 +59,6 @@ const onbetaaldOv: LeaveTypeLike = {
   weeksMultiplier: 17,
   payer: "UNPAID",
   payPercent: null,
-  cappedAtMaxDagloon: false,
   deadlineAnchor: "YEARS_AFTER_BIRTH",
   deadlineValue: 8,
   fallbackLeaveTypeId: null,
@@ -88,7 +78,7 @@ function impact(
   contracts: ContractLike[] = [contractA, contractB],
   supplements: SupplementLike[] = [],
 ) {
-  return monthImpact({ month, entries, contracts, leaveTypes, supplements, maxDaglonen: MAX_DAGLONEN });
+  return monthImpact({ month, entries, contracts, leaveTypes, supplements });
 }
 
 describe("normalGrossForMonth", () => {
@@ -115,12 +105,11 @@ describe("monthImpact", () => {
     expect(result.difference).toBeCloseTo(0, 6);
   });
 
-  it("laat 30% verlies zien bij UWV-verlof onder het maximumdagloon", () => {
+  it("laat 30% verlies zien bij UWV-verlof", () => {
     const result = impact("2026-02", [entry("2026-02-02", 8, "lt-betaald")]);
     const dagloon = 4000 / 21.75;
     expect(result.uwvBenefit).toBeCloseTo(0.7 * dagloon, 6);
     expect(result.difference).toBeCloseTo(-0.3 * dagloon, 6);
-    expect(result.cappedByMaxDagloon).toBe(false);
   });
 
   it("laat het volle dagloon als verlies zien bij onbetaald verlof", () => {
@@ -150,13 +139,11 @@ describe("monthImpact", () => {
     expect(april.uwvBenefit).toBeCloseTo(2.5 * 0.7 * (3400 / 21.75), 6);
   });
 
-  it("capt de uitkering bij een hoog salaris en meldt dat", () => {
+  it("keert ook bij een hoog salaris 70% van het eigen dagloon uit", () => {
     const rijk: ContractLike = { ...contractA, grossMonthlySalary: 8000, endDate: null };
     const result = impact("2026-02", [entry("2026-02-02", 8, "lt-betaald")], [rijk]);
-    expect(result.cappedByMaxDagloon).toBe(true);
-    expect(result.uwvBenefit).toBeCloseTo(0.7 * 309.91, 6);
-    // Effectief minder dan 70% van het eigen dagloon.
-    expect(result.uwvBenefit).toBeLessThan(0.7 * (8000 / 21.75));
+    expect(result.uwvBenefit).toBeCloseTo(0.7 * (8000 / 21.75), 6);
+    expect(result.difference).toBeCloseTo(-0.3 * (8000 / 21.75), 6);
   });
 
   it("heft het verlies op met een werkgeversaanvulling tot 100%", () => {
@@ -166,7 +153,6 @@ describe("monthImpact", () => {
         contractId: "a",
         leaveTypeId: betaaldOv.id,
         topUpToPercent: 100,
-        topUpUncapped: true,
         extraWeeks: null,
         deadlineOverrideMonths: null,
       },

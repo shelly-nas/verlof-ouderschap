@@ -17,7 +17,6 @@ const betaaldOv: LeaveTypeLike = {
   weeksMultiplier: 9,
   payer: "UWV",
   payPercent: 70,
-  cappedAtMaxDagloon: true,
   deadlineAnchor: "YEARS_AFTER_BIRTH",
   deadlineValue: 1,
   fallbackLeaveTypeId: null,
