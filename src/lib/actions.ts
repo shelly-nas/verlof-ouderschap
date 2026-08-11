@@ -10,7 +10,6 @@ import {
   contractSchema,
   formatZodError,
   leaveTypeSchema,
-  maxDagloonSchema,
   weekSaveSchema,
 } from "./validation";
 
@@ -408,36 +407,4 @@ export async function deleteLeaveType(leaveTypeId: string): Promise<ActionResult
   await prisma.leaveType.delete({ where: { id: leaveTypeId } });
   revalidateAll();
   return { ok: true, message: "Verlofsoort verwijderd." };
-}
-
-export async function saveMaxDagloon(form: FormData): Promise<ActionResult> {
-  const parsed = maxDagloonSchema.safeParse({
-    validFrom: formValue(form, "validFrom") ?? "",
-    amount: formValue(form, "amount") ?? "",
-    source: formValue(form, "source"),
-  });
-  if (!parsed.success) return fail(formatZodError(parsed.error));
-
-  await prisma.maxDagloon.upsert({
-    where: { validFrom: toDbDate(parsed.data.validFrom) },
-    update: { amount: String(parsed.data.amount), source: parsed.data.source },
-    create: {
-      validFrom: toDbDate(parsed.data.validFrom),
-      amount: String(parsed.data.amount),
-      source: parsed.data.source,
-    },
-  });
-
-  revalidateAll();
-  return { ok: true, message: "Maximumdagloon opgeslagen." };
-}
-
-export async function deleteMaxDagloon(id: string): Promise<ActionResult> {
-  const count = await prisma.maxDagloon.count();
-  if (count <= 1) {
-    return fail(["Er moet minstens één maximumdagloon blijven staan."]);
-  }
-  await prisma.maxDagloon.delete({ where: { id } });
-  revalidateAll();
-  return { ok: true, message: "Maximumdagloon verwijderd." };
 }

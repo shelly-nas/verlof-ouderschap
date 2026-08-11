@@ -2,15 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import {
-  deleteLeaveType,
-  deleteMaxDagloon,
-  saveLeaveType,
-  saveMaxDagloon,
-} from "@/lib/actions";
-import { formatDateNl } from "@/lib/dates";
-import { formatEuro } from "@/lib/money";
-import type { LeaveTypeDto, MaxDagloonDto } from "@/lib/queries";
+import { deleteLeaveType, saveLeaveType } from "@/lib/actions";
+import type { LeaveTypeDto } from "@/lib/queries";
 import { Alert, Badge, Card, Field, inputClass } from "./ui";
 
 const payerLabels = {
@@ -26,13 +19,7 @@ const anchorLabels = {
   NONE: "geen deadline",
 } as const;
 
-export function SettingsManager({
-  leaveTypes,
-  maxDaglonen,
-}: {
-  leaveTypes: LeaveTypeDto[];
-  maxDaglonen: MaxDagloonDto[];
-}) {
+export function SettingsManager({ leaveTypes }: { leaveTypes: LeaveTypeDto[] }) {
   const router = useRouter();
   const [errors, setErrors] = useState<string[]>([]);
   const [editing, setEditing] = useState<string | null>(null);
@@ -327,78 +314,6 @@ export function SettingsManager({
               </div>
             ),
           )}
-        </div>
-      </Card>
-
-      <Card
-        title="Maximumdagloon"
-        description="UWV past dit bedrag aan op 1 januari en 1 juli. Voeg een nieuwe regel toe zodra een bedrag bekend is; berekeningen gebruiken het bedrag dat gold op de verlofdag zelf."
-      >
-        <form
-          action={(form) => run(() => saveMaxDagloon(form))}
-          className="mb-5 flex flex-wrap items-end gap-3"
-        >
-          <Field label="Geldig vanaf" className="min-w-44">
-            <input name="validFrom" type="date" className={inputClass} required />
-          </Field>
-          <Field label="Bedrag per dag" className="min-w-36">
-            <input
-              name="amount"
-              type="number"
-              step="0.01"
-              min="0"
-              className={inputClass}
-              required
-            />
-          </Field>
-          <Field label="Bron" className="min-w-56 flex-1">
-            <input name="source" className={inputClass} placeholder="URL of toelichting" />
-          </Field>
-          <button
-            type="submit"
-            disabled={pending}
-            className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white disabled:opacity-60"
-          >
-            Opslaan
-          </button>
-        </form>
-
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[32rem] text-sm">
-            <thead>
-              <tr className="border-b border-[var(--border)] text-left text-[var(--muted)]">
-                <th className="py-2 font-medium">Geldig vanaf</th>
-                <th className="py-2 text-right font-medium">Maximumdagloon</th>
-                <th className="py-2 text-right font-medium">70% daarvan</th>
-                <th className="py-2" />
-              </tr>
-            </thead>
-            <tbody>
-              {maxDaglonen.map((row) => (
-                <tr key={row.id} className="border-b border-[var(--border)] last:border-0">
-                  <td className="py-2">{formatDateNl(row.validFrom)}</td>
-                  <td className="py-2 text-right tabular-nums">{formatEuro(row.amount)}</td>
-                  <td className="py-2 text-right tabular-nums text-[var(--muted)]">
-                    {formatEuro(row.amount * 0.7)}
-                  </td>
-                  <td className="py-2 text-right">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (confirm(`Regel van ${formatDateNl(row.validFrom)} verwijderen?`)) {
-                          run(() => deleteMaxDagloon(row.id));
-                        }
-                      }}
-                      disabled={pending}
-                      className="text-sm text-red-700 disabled:opacity-60 dark:text-red-400"
-                    >
-                      Verwijderen
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
         </div>
       </Card>
     </div>

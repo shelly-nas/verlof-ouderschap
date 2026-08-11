@@ -113,12 +113,6 @@ export const leaveTypeSchema = z
     { message: "Vul een termijn in of kies 'geen deadline'", path: ["deadlineValue"] },
   );
 
-export const maxDagloonSchema = z.object({
-  validFrom: dateOnly,
-  amount: requiredNumber.refine((value) => value > 0, "Bedrag moet groter dan 0 zijn"),
-  source: optionalText,
-});
-
 /** Eén regel in het weekscherm. hours = 0 betekent: verwijder deze regel. */
 export const weekEntrySchema = z.object({
   date: dateOnly,
@@ -139,7 +133,6 @@ export const weekSaveSchema = z.object({
 export type ContractInput = z.infer<typeof contractSchema>;
 export type ChildInput = z.infer<typeof childSchema>;
 export type LeaveTypeInput = z.infer<typeof leaveTypeSchema>;
-export type MaxDagloonInput = z.infer<typeof maxDagloonSchema>;
 export type WeekSaveInput = z.infer<typeof weekSaveSchema>;
 
 /** Zet een zod-fout om naar een platte lijst meldingen voor de UI. */
