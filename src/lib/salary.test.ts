@@ -1,0 +1,193 @@
+import { describe, expect, it } from "vitest";
+import type { LeaveEntryLike } from "./balances";
+import type { ContractLike } from "./contracts";
+import type { MaxDagloonRow } from "./dagloon";
+import type { LeaveTypeLike, SupplementLike } from "./entitlements";
+import { monthImpact, normalGrossForMonth } from "./salary";
+
+const MAX_DAGLONEN: MaxDagloonRow[] = [
+  { validFrom: "2025-01-01", amount: 290.67 },
+  { validFrom: "2025-07-01", amount: 297.82 },
+  { validFrom: "2026-01-01", amount: 309.91 },
+];
+
+const contractA: ContractLike = {
+  id: "a",
+  employerName: "Werkgever A",
+  employerEmail: "a@example.com",
+  hoursPerWeek: 40,
+  grossMonthlySalary: 4000,
+  startDate: "2025-01-01",
+  endDate: "2026-03-31",
+};
+
+const contractB: ContractLike = {
+  id: "b",
+  employerName: "Werkgever B",
+  employerEmail: "b@example.com",
+  hoursPerWeek: 32,
+  grossMonthlySalary: 3400,
+  startDate: "2026-04-01",
+  endDate: null,
+};
+
+const betaaldOv: LeaveTypeLike = {
+  id: "lt-betaald",
+  code: "BETAALD_OUDERSCHAPSVERLOF",
+  name: "Betaald ouderschapsverlof",
+  weeksMultiplier: 9,
+  payer: "UWV",
+  payPercent: 70,
+  cappedAtMaxDagloon: true,
+  deadlineAnchor: "YEARS_AFTER_BIRTH",
+  deadlineValue: 1,
+  fallbackLeaveTypeId: null,
+  colorHex: null,
+  sortOrder: 30,
+};
+
+const geboorteverlof: LeaveTypeLike = {
+  id: "lt-geboorte",
+  code: "GEBOORTEVERLOF",
+  name: "Geboorteverlof",
+  weeksMultiplier: 1,
+  payer: "EMPLOYER",
+  payPercent: 100,
+  cappedAtMaxDagloon: false,
+  deadlineAnchor: "WEEKS_AFTER_BIRTH",
+  deadlineValue: 4,
+  fallbackLeaveTypeId: null,
+  colorHex: null,
+  sortOrder: 10,
+};
+
+const onbetaaldOv: LeaveTypeLike = {
+  id: "lt-onbetaald",
+  code: "ONBETAALD_OUDERSCHAPSVERLOF",
+  name: "Onbetaald ouderschapsverlof",
+  weeksMultiplier: 17,
+  payer: "UNPAID",
+  payPercent: null,
+  cappedAtMaxDagloon: false,
+  deadlineAnchor: "YEARS_AFTER_BIRTH",
+  deadlineValue: 8,
+  fallbackLeaveTypeId: null,
+  colorHex: null,
+  sortOrder: 40,
+};
+
+const leaveTypes = [geboorteverlof, betaaldOv, onbetaaldOv];
+
+function entry(date: string, hours: number, leaveTypeId: string): LeaveEntryLike {
+  return { id: `${date}-${leaveTypeId}`, date, hours, childId: "c1", leaveTypeId };
+}
+
+function impact(
+  month: string,
+  entries: LeaveEntryLike[],
+  contracts: ContractLike[] = [contractA, contractB],
+  supplements: SupplementLike[] = [],
+) {
+  return monthImpact({ month, entries, contracts, leaveTypes, supplements, maxDaglonen: MAX_DAGLONEN });
+}
+
+describe("normalGrossForMonth", () => {
+  it("geeft het volledige maandsalaris bij één contract", () => {
+    expect(normalGrossForMonth("2026-02", [contractA])).toBeCloseTo(4000, 6);
+  });
+
+  it("rekent bij een contractwissel naar rato van kalenderdagen", () => {
+    // Maart: 31 dagen contract A. April: 30 dagen contract B.
+    expect(normalGrossForMonth("2026-03", [contractA, contractB])).toBeCloseTo(4000, 6);
+    expect(normalGrossForMonth("2026-04", [contractA, contractB])).toBeCloseTo(3400, 6);
+  });
+
+  it("geeft 0 zonder contract", () => {
+    expect(normalGrossForMonth("2020-01", [contractA])).toBe(0);
+  });
+});
+
+describe("monthImpact", () => {
+  it("laat geen inkomensverlies zien bij volledig doorbetaald geboorteverlof", () => {
+    const result = impact("2026-02", [entry("2026-02-02", 8, "lt-geboorte")]);
+    expect(result.employerPaid).toBeGreaterThan(0);
+    expect(result.uwvBenefit).toBe(0);
+    expect(result.difference).toBeCloseTo(0, 6);
+  });
+
+  it("laat 30% verlies zien bij UWV-verlof onder het maximumdagloon", () => {
+    const result = impact("2026-02", [entry("2026-02-02", 8, "lt-betaald")]);
+    const dagloon = 4000 / 21.75;
+    expect(result.uwvBenefit).toBeCloseTo(0.7 * dagloon, 6);
+    expect(result.difference).toBeCloseTo(-0.3 * dagloon, 6);
+    expect(result.cappedByMaxDagloon).toBe(false);
+  });
+
+  it("laat het volle dagloon als verlies zien bij onbetaald verlof", () => {
+    const result = impact("2026-02", [entry("2026-02-02", 8, "lt-onbetaald")]);
+    const dagloon = 4000 / 21.75;
+    expect(result.totalReceived).toBeCloseTo(4000 - dagloon, 6);
+    expect(result.difference).toBeCloseTo(-dagloon, 6);
+  });
+
+  it("gebruikt per verlofdag het contract dat op die dag gold", () => {
+    // Week van 30 maart 2026 kruist de contractwissel op 1 april.
+    const entries = [
+      entry("2026-03-30", 8, "lt-betaald"),
+      entry("2026-03-31", 8, "lt-betaald"),
+    ];
+    const maart = impact("2026-03", entries);
+    // Twee volle dagen bij contract A: 8 uur is een hele dag bij 40 uur/week.
+    expect(maart.leaveDayEquivalents).toBeCloseTo(2, 6);
+    expect(maart.uwvBenefit).toBeCloseTo(2 * 0.7 * (4000 / 21.75), 6);
+
+    // Dezelfde uren in april vallen onder contract B: 8 uur is daar 1,25 dag.
+    const april = impact("2026-04", [
+      entry("2026-04-02", 8, "lt-betaald"),
+      entry("2026-04-03", 8, "lt-betaald"),
+    ]);
+    expect(april.leaveDayEquivalents).toBeCloseTo(2.5, 6);
+    expect(april.uwvBenefit).toBeCloseTo(2.5 * 0.7 * (3400 / 21.75), 6);
+  });
+
+  it("capt de uitkering bij een hoog salaris en meldt dat", () => {
+    const rijk: ContractLike = { ...contractA, grossMonthlySalary: 8000, endDate: null };
+    const result = impact("2026-02", [entry("2026-02-02", 8, "lt-betaald")], [rijk]);
+    expect(result.cappedByMaxDagloon).toBe(true);
+    expect(result.uwvBenefit).toBeCloseTo(0.7 * 309.91, 6);
+    // Effectief minder dan 70% van het eigen dagloon.
+    expect(result.uwvBenefit).toBeLessThan(0.7 * (8000 / 21.75));
+  });
+
+  it("heft het verlies op met een werkgeversaanvulling tot 100%", () => {
+    const rijk: ContractLike = { ...contractA, grossMonthlySalary: 8000, endDate: null };
+    const supplements: SupplementLike[] = [
+      {
+        contractId: "a",
+        leaveTypeId: betaaldOv.id,
+        topUpToPercent: 100,
+        topUpUncapped: true,
+        extraWeeks: null,
+        deadlineOverrideMonths: null,
+      },
+    ];
+    const result = impact("2026-02", [entry("2026-02-02", 8, "lt-betaald")], [rijk], supplements);
+    expect(result.employerTopUp).toBeGreaterThan(0);
+    expect(result.difference).toBeCloseTo(0, 6);
+  });
+
+  it("negeert verlofdagen buiten de gevraagde maand", () => {
+    const result = impact("2026-02", [
+      entry("2026-01-30", 8, "lt-betaald"),
+      entry("2026-02-02", 8, "lt-betaald"),
+      entry("2026-03-02", 8, "lt-betaald"),
+    ]);
+    expect(result.leaveHours).toBe(8);
+  });
+
+  it("telt verlofdagen zonder geldig contract apart", () => {
+    const result = impact("2024-02", [entry("2024-02-01", 8, "lt-betaald")]);
+    expect(result.entriesWithoutContract).toBe(1);
+    expect(result.uwvBenefit).toBe(0);
+  });
+});
