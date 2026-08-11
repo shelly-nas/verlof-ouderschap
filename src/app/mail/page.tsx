@@ -21,9 +21,10 @@ export default async function MailPage({
 }) {
   const { maand } = await searchParams;
   const now = today();
+  // Standaard de huidige maand; met ?maand=jjjj-mm kies je een andere.
   const monthStart = /^\d{4}-\d{2}$/.test(maand ?? "")
     ? startOfMonth(`${maand}-01`)
-    : reportingMonthFor(now);
+    : startOfMonth(now);
 
   const { contracts, children, leaveTypes, entries } = await getAppData();
   const contract = activeContract(contracts, now);
@@ -53,7 +54,10 @@ export default async function MailPage({
   });
 
   const daysLeft = daysUntilDeadline(now);
-  const isNextMonth = monthStart === reportingMonthFor(now);
+  // De maand waarover je vóór de 15e moet melden is de eerstvolgende.
+  const reportingMonth = reportingMonthFor(now);
+  const isReportingMonth = monthStart === reportingMonth;
+  const isCurrentMonth = monthStart === startOfMonth(now);
   const previous = monthKey(addMonthsOnly(monthStart, -1));
   const next = monthKey(addMonthsOnly(monthStart, 1));
 
@@ -76,10 +80,10 @@ export default async function MailPage({
             ← Vorige
           </Link>
           <Link
-            href={`/mail?maand=${monthKey(reportingMonthFor(now))}`}
+            href={`/mail?maand=${monthKey(now)}`}
             className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-sm"
           >
-            Volgende maand
+            Deze maand
           </Link>
           <Link
             href={`/mail?maand=${next}`}
@@ -90,7 +94,7 @@ export default async function MailPage({
         </div>
       </div>
 
-      {isNextMonth &&
+      {isReportingMonth &&
         (daysLeft > 0 ? (
           <Alert tone="info">
             Nog {daysLeft} dag{daysLeft === 1 ? "" : "en"} om deze melding vóór de 15e te
@@ -104,6 +108,17 @@ export default async function MailPage({
             geleden verstreken.
           </Alert>
         ))}
+
+      {isCurrentMonth && (
+        <Alert tone="info">
+          Je kijkt naar de lopende maand. Meld je het verlof van{" "}
+          {formatMonthNl(reportingMonth)} vóór de 15e, ga dan naar{" "}
+          <Link href={`/mail?maand=${monthKey(reportingMonth)}`} className="underline">
+            {formatMonthNl(reportingMonth)}
+          </Link>
+          {daysLeft > 0 ? ` — nog ${daysLeft} dag${daysLeft === 1 ? "" : "en"}.` : "."}
+        </Alert>
+      )}
 
       {mail.entryCount === 0 && (
         <Alert tone="info">
