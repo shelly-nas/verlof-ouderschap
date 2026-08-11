@@ -5,8 +5,6 @@ import { activeContract } from "@/lib/contracts";
 import {
   formatDateNl,
   formatMonthNl,
-  isoWeekKey,
-  isoWeekNumber,
   monthKey,
   today,
 } from "@/lib/dates";
@@ -96,10 +94,10 @@ export default async function DashboardPage() {
           </p>
         </div>
         <Link
-          href={`/week/${isoWeekKey(now)}`}
+          href={`/maand/${currentMonth}`}
           className="rounded-lg bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white"
         >
-          Week {isoWeekNumber(isoWeekKey(now))} invoeren
+          {formatMonthNl(`${currentMonth}-01`)} invoeren
         </Link>
       </div>
 

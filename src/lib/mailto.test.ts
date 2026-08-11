@@ -42,21 +42,24 @@ function build(entries: LeaveEntryLike[], children: ChildLike[] = [child]) {
 }
 
 describe("buildLeaveEmail", () => {
-  it("groepeert de dagen per week met datum en uren", () => {
+  it("zet alle dagen van de maand op een rij met datum en uren", () => {
     const result = build([entry("2026-03-03", 8), entry("2026-03-05", 4)]);
     expect(result.subject).toBe("Opname verlof maart 2026");
     expect(result.to).toBe("hr@example.com");
-    expect(result.body).toContain("Week 10");
     expect(result.body).toContain("8 uur");
     expect(result.body).toContain("4 uur");
     expect(result.body).toContain("Totaal: 12 uur.");
     expect(result.totalHours).toBe(12);
+    // Geen weekkopjes meer: de maand is de eenheid.
+    expect(result.body).not.toContain("Week ");
   });
 
-  it("splitst dagen over meerdere weken", () => {
-    const result = build([entry("2026-03-03", 8), entry("2026-03-10", 8)]);
-    expect(result.body).toContain("Week 10");
-    expect(result.body).toContain("Week 11");
+  it("zet de dagen chronologisch, ook over weken heen", () => {
+    const result = build([entry("2026-03-10", 8), entry("2026-03-03", 8)]);
+    const eersteIndex = result.body.indexOf("3 mrt");
+    const tweedeIndex = result.body.indexOf("10 mrt");
+    expect(eersteIndex).toBeGreaterThan(-1);
+    expect(tweedeIndex).toBeGreaterThan(eersteIndex);
   });
 
   it("noemt het kind alleen als er meerdere kinderen zijn", () => {
@@ -106,8 +109,8 @@ describe("buildLeaveEmail", () => {
     const short = build([entry("2026-03-03", 8)]);
     expect(short.tooLong).toBe(false);
 
-    // Een volle maand verlof levert een link op die mailclients afkappen.
-    const many = Array.from({ length: 22 }, (_, index) =>
+    // Een volledige maand verlof levert een link op die mailclients afkappen.
+    const many = Array.from({ length: 31 }, (_, index) =>
       entry(`2026-03-${`${index + 1}`.padStart(2, "0")}`, 8),
     );
     const long = build(many);

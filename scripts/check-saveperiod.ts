@@ -1,9 +1,11 @@
 /**
- * Controleert het opslaan van een week via de draaiende app (POST /api/entries):
- * het diff-gedrag (toevoegen, wijzigen, verwijderen), de contracttoewijzing per
- * dag en de weigering van ongeldige invoer.
+ * Controleert het opslaan van een periode via de draaiende app (POST
+ * /api/entries): het diff-gedrag (toevoegen, wijzigen, verwijderen), de
+ * contracttoewijzing per dag en de weigering van ongeldige invoer.
  *
- * Vereist een draaiende dev-server. Draai met `npx tsx scripts/check-saveweek.ts`.
+ * LET OP: dit script wist alle verlofdagen in de gebruikte testperiode.
+ * Draai het alleen op testdata (zie scripts/seed-testdata.ts), niet op je
+ * echte registratie. Vereist een draaiende dev-server.
  */
 import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
@@ -27,16 +29,38 @@ function check(label: string, actual: unknown, expected: unknown) {
 
 type Row = { date: string; childId: string; leaveTypeId: string; hours: number };
 
-async function saveWeek(weekStart: string, rows: Row[]) {
+async function savePeriod(from: string, to: string, rows: Row[]) {
   const response = await fetch(`${BASE}/api/entries`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ weekStart, rows }),
+    body: JSON.stringify({ from, to, rows }),
+  });
+  return { status: response.status, body: await response.json() };
+}
+
+async function saveMonth(month: string, rows: Row[]) {
+  const response = await fetch(`${BASE}/api/entries`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ month, rows }),
   });
   return { status: response.status, body: await response.json() };
 }
 
 async function main() {
+  const testContracts = await prisma.contract.count({
+    where: { employerName: { in: ["Werkgever X", "Werkgever Y"] } },
+  });
+  if (testContracts < 2) {
+    console.error(
+      "Dit script verwacht de testdata uit scripts/seed-testdata.ts.\n" +
+        "Draai eerst: npx tsx scripts/seed-testdata.ts\n" +
+        "Let op: dat vervangt je huidige contracten, kinderen en verlofdagen.",
+    );
+    process.exitCode = 1;
+    return;
+  }
+
   const child = await prisma.child.findFirstOrThrow();
   const betaaldOv = await prisma.leaveType.findFirstOrThrow({
     where: { code: "BETAALD_OUDERSCHAPSVERLOF" },
@@ -51,10 +75,11 @@ async function main() {
     where: { employerName: "Werkgever Y" },
   });
 
+
   await prisma.leaveEntry.deleteMany();
 
-  console.log("\n== Week 14 2026 opslaan (kruist de contractwissel) ==");
-  const first = await saveWeek("2026-03-30", [
+  console.log("\n== Periode 30 mrt t/m 5 apr 2026 (kruist de contractwissel) ==");
+  const first = await savePeriod("2026-03-30", "2026-04-05", [
     { date: "2026-03-30", childId: child.id, leaveTypeId: betaaldOv.id, hours: 8 },
     { date: "2026-03-31", childId: child.id, leaveTypeId: betaaldOv.id, hours: 8 },
     { date: "2026-04-02", childId: child.id, leaveTypeId: betaaldOv.id, hours: 8 },
@@ -75,7 +100,7 @@ async function main() {
   );
 
   console.log("\n== Diff: wijzigen, verwijderen en toevoegen in één opslag ==");
-  const second = await saveWeek("2026-03-30", [
+  const second = await savePeriod("2026-03-30", "2026-04-05", [
     { date: "2026-03-30", childId: child.id, leaveTypeId: betaaldOv.id, hours: 4 },
     { date: "2026-04-02", childId: child.id, leaveTypeId: betaaldOv.id, hours: 8 },
     { date: "2026-04-02", childId: child.id, leaveTypeId: aanvullend.id, hours: 2 },
@@ -107,35 +132,52 @@ async function main() {
     leaveTypeId: e.leaveTypeId,
     hours: Number(e.hours.toString()),
   }));
-  await saveWeek("2026-03-30", rows);
+  await savePeriod("2026-03-30", "2026-04-05", rows);
   check("aantal regels ongewijzigd", await prisma.leaveEntry.count(), after.length);
 
   console.log("\n== Weigeringen ==");
-  const outsideWeek = await saveWeek("2026-03-30", [
+  const outsidePeriod = await savePeriod("2026-03-30", "2026-04-05", [
     { date: "2026-04-20", childId: child.id, leaveTypeId: betaaldOv.id, hours: 8 },
   ]);
-  check("dag buiten de week wordt geweigerd", outsideWeek.body.ok, false);
+  check("dag buiten de periode wordt geweigerd", outsidePeriod.body.ok, false);
 
-  const noContract = await saveWeek("2024-01-01", [
+  const noContract = await savePeriod("2024-01-01", "2024-01-07", [
     { date: "2024-01-01", childId: child.id, leaveTypeId: betaaldOv.id, hours: 8 },
   ]);
   check("dag zonder contract wordt geweigerd", noContract.body.ok, false);
   if (noContract.body.errors) console.log(`     melding: ${noContract.body.errors[0]}`);
 
-  const duplicate = await saveWeek("2026-03-30", [
+  const duplicate = await savePeriod("2026-03-30", "2026-04-05", [
     { date: "2026-03-30", childId: child.id, leaveTypeId: betaaldOv.id, hours: 4 },
     { date: "2026-03-30", childId: child.id, leaveTypeId: betaaldOv.id, hours: 4 },
   ]);
   check("dubbele regel wordt geweigerd", duplicate.body.ok, false);
 
-  const badHours = await saveWeek("2026-03-30", [
+  const badHours = await savePeriod("2026-03-30", "2026-04-05", [
     { date: "2026-03-30", childId: child.id, leaveTypeId: betaaldOv.id, hours: 30 },
   ]);
   check("meer dan 24 uur op een dag wordt geweigerd", badHours.body.ok, false);
 
-  console.log("\n== Lege week wist de regels ==");
-  await saveWeek("2026-03-30", []);
-  check("week is leeg", await prisma.leaveEntry.count(), 0);
+  console.log("\n== Lege periode wist de regels ==");
+  await savePeriod("2026-03-30", "2026-04-05", []);
+  check("periode is leeg", await prisma.leaveEntry.count(), 0);
+
+  console.log("\n== Hele maand opslaan ==");
+  const monthRows: Row[] = [3, 4, 5].map((day) => ({
+    date: `2026-04-${`${day}`.padStart(2, "0")}`,
+    childId: child.id,
+    leaveTypeId: betaaldOv.id,
+    hours: 8,
+  }));
+  const monthResult = await saveMonth("2026-04", monthRows);
+  check("maand opslaan slaagt", monthResult.body.ok, true);
+  check("drie regels in april", await prisma.leaveEntry.count(), 3);
+
+  const badMonth = await saveMonth("2026-4", monthRows);
+  check("ongeldig maandformaat wordt geweigerd", badMonth.body.ok, false);
+
+  await saveMonth("2026-04", []);
+  check("lege maand wist april", await prisma.leaveEntry.count(), 0);
 
   console.log(
     `\n${failures === 0 ? "Alle controles geslaagd." : `${failures} controle(s) mislukt.`}`,

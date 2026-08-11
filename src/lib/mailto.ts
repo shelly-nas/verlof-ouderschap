@@ -3,12 +3,8 @@ import {
   type DateOnly,
   addMonthsOnly,
   endOfMonth,
-  formatDateShortNl,
   formatDayShort,
   formatMonthNl,
-  isoWeekKey,
-  isoWeekNumber,
-  parseIsoWeekKey,
   startOfMonth,
 } from "./dates";
 import type { ChildLike, LeaveTypeLike } from "./entitlements";
@@ -86,33 +82,17 @@ export function buildLeaveEmail(input: MailInput): MailResult {
   if (entries.length === 0) {
     lines.push("Ik neem deze maand geen verlof op.");
   } else {
-    const byWeek = new Map<string, LeaveEntryLike[]>();
+    // Alle verlofdagen van de maand op een rij, chronologisch.
     for (const entry of entries) {
-      const key = isoWeekKey(entry.date);
-      const list = byWeek.get(key) ?? [];
-      list.push(entry);
-      byWeek.set(key, list);
-    }
-
-    for (const [weekKey, weekEntries] of [...byWeek.entries()].sort((a, b) =>
-      a[0].localeCompare(b[0]),
-    )) {
-      const { start, end } = parseIsoWeekKey(weekKey);
+      const leaveType = leaveTypeById.get(entry.leaveTypeId);
+      const child = childById.get(entry.childId);
+      const suffix = multipleChildren && child ? ` (${child.name})` : "";
+      const typeName = leaveType ? ` ${leaveType.name.toLowerCase()}` : "";
       lines.push(
-        `Week ${isoWeekNumber(weekKey)} (${formatDateShortNl(start)} t/m ${formatDateShortNl(end)})`,
+        `${formatDayShort(entry.date)}: ${formatHoursNumber(entry.hours)} uur${typeName}${suffix}`,
       );
-
-      for (const entry of weekEntries) {
-        const leaveType = leaveTypeById.get(entry.leaveTypeId);
-        const child = childById.get(entry.childId);
-        const suffix = multipleChildren && child ? ` (${child.name})` : "";
-        const typeName = leaveType ? ` ${leaveType.name.toLowerCase()}` : "";
-        lines.push(
-          `  ${formatDayShort(entry.date)}: ${formatHoursNumber(entry.hours)} uur${typeName}${suffix}`,
-        );
-      }
-      lines.push("");
     }
+    lines.push("");
 
     const totalHours = entries.reduce((sum, entry) => sum + entry.hours, 0);
     lines.push(`Totaal: ${formatHoursNumber(totalHours)} uur.`);

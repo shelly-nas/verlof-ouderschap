@@ -34,8 +34,31 @@ model Contract {
   startDate          DateTime  @db.Date
   endDate            DateTime? @db.Date
   notes              String?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+
+  // Posten van de loonstrook, voor de netto-berekening. Alles optioneel: laat
+  // je ze leeg, dan rekent de app alleen bruto.
+
+  /// Pensioenpremie als percentage van de premiegrondslag.
+  pensionPercent       Decimal? @db.Decimal(6, 3)
+  /// Grondslag waarover de pensioenpremie wordt berekend (bruto minus franchise).
+  pensionBase          Decimal? @db.Decimal(10, 2)
+  /// WGA Hiaat Plus als percentage van de eigen grondslag.
+  wgaPercent           Decimal? @db.Decimal(6, 3)
+  wgaBase              Decimal? @db.Decimal(10, 2)
+  /// WIA Excedent: vast bedrag per maand.
+  wiaExcedent          Decimal? @db.Decimal(10, 2)
+  /// Bruto kostentoeslag: telt mee in het brutoloon.
+  grossExpenseAllowance Decimal? @db.Decimal(10, 2)
+  /// Bijtelling auto: percentage van de cataloguswaarde, verhoogt het heffingsloon.
+  bijtellingPercent    Decimal? @db.Decimal(6, 3)
+  bijtellingBase       Decimal? @db.Decimal(10, 2)
+  /// Onkostenvergoeding: netto, geen loonheffing.
+  netExpenseAllowance  Decimal? @db.Decimal(10, 2)
+  /// Is de loonheffingskorting bij deze werkgever toegepast?
+  applyTaxCredits      Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   supplements  EmployerSupplement[]
   leaveEntries LeaveEntry[]

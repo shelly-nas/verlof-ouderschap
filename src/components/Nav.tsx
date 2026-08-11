@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 
 const links = [
   { href: "/", label: "Overzicht" },
-  { href: "/week", label: "Week invoeren" },
+  { href: "/maand", label: "Maand invoeren" },
   { href: "/saldo", label: "Saldo" },
   { href: "/salaris", label: "Salaris" },
   { href: "/mail", label: "Mail" },

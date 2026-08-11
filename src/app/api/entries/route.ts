@@ -1,18 +1,20 @@
 import { NextResponse } from "next/server";
-import { type WeekRowInput, saveWeek } from "@/lib/actions";
-import { type DateOnly, startOfIsoWeek } from "@/lib/dates";
+import { type LeaveRowInput, saveMonth, savePeriod } from "@/lib/actions";
 import { getLeaveEntries } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
-/** GET /api/entries?from=2026-03-30&to=2026-04-05 */
+const DATE = /^\d{4}-\d{2}-\d{2}$/;
+const MONTH = /^\d{4}-\d{2}$/;
+
+/** GET /api/entries?from=2026-08-01&to=2026-08-31 */
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const from = url.searchParams.get("from");
   const to = url.searchParams.get("to");
 
   if (from && to) {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to)) {
+    if (!DATE.test(from) || !DATE.test(to)) {
       return NextResponse.json(
         { error: "Gebruik het formaat jjjj-mm-dd voor from en to." },
         { status: 400 },
@@ -25,26 +27,31 @@ export async function GET(request: Request) {
 }
 
 /**
- * POST /api/entries — slaat een hele week op als één transactie.
- * Body: { weekStart: "2026-03-30", rows: [{ date, childId, leaveTypeId, hours }] }
+ * POST /api/entries — slaat een periode op als één transactie.
+ *
+ * Body: `{ month: "2026-08", rows: [...] }` voor een hele maand, of
+ * `{ from, to, rows }` voor een vrije periode. De rows vormen de gewenste
+ * eindtoestand; wat er niet in staat wordt verwijderd.
  */
 export async function POST(request: Request) {
-  let body: { weekStart?: string; rows?: WeekRowInput[] };
+  let body: { month?: string; from?: string; to?: string; rows?: LeaveRowInput[] };
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Ongeldige JSON." }, { status: 400 });
   }
 
-  if (!body.weekStart || !/^\d{4}-\d{2}-\d{2}$/.test(body.weekStart)) {
-    return NextResponse.json(
-      { error: "weekStart ontbreekt of heeft niet het formaat jjjj-mm-dd." },
-      { status: 400 },
-    );
-  }
+  const rows = body.rows ?? [];
 
-  const weekStart = startOfIsoWeek(body.weekStart as DateOnly);
-  const result = await saveWeek(weekStart, body.rows ?? []);
+  const result = body.month
+    ? MONTH.test(body.month)
+      ? await saveMonth(body.month, rows)
+      : { ok: false as const, errors: ["month heeft niet het formaat jjjj-mm."] }
+    : body.from && body.to
+      ? DATE.test(body.from) && DATE.test(body.to)
+        ? await savePeriod(body.from, body.to, rows)
+        : { ok: false as const, errors: ["from en to hebben niet het formaat jjjj-mm-dd."] }
+      : { ok: false as const, errors: ["Geef month, of from en to op."] };
 
   return result.ok
     ? NextResponse.json({ ok: true, message: result.message })

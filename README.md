@@ -1,7 +1,7 @@
 # Verlofregistratie ouderschapsverlof
 
-Een persoonlijke urenregistratie voor ouderschapsverlof: per week invoeren, saldo
-en deadlines bewaken, zien wat het verlof met je brutosalaris doet, en met één
+Een persoonlijke urenregistratie voor ouderschapsverlof: per maand invoeren, saldo
+en deadlines bewaken, zien wat het verlof netto met je salaris doet, en met één
 knop een verlofmelding naar je werkgever mailen.
 
 ## Snel starten (lokaal)
@@ -81,19 +81,48 @@ Enkele regels die in de berekening verwerkt zitten:
   percentage, extra weken, ruimere termijn). Laat je dat leeg, dan gelden puur de
   UWV-regels.
 
-De salarisweergave is een bruto-indicatie: loonheffing, vakantiegeld en
-pensioenpremies blijven buiten beschouwing.
+## Netto salaris
+
+Vul je bij het contract de posten van je loonstrook in (pensioenpremie, WGA
+Hiaat, WIA Excedent, bruto kostentoeslag, bijtelling, onkostenvergoeding), dan
+rekent de app je nettoloon uit — ook in een maand met verlof:
+
+```
+brutoloon + bruto kostentoeslag
+  − pensioenpremie, WGA Hiaat, WIA Excedent
+  + bijtelling
+  = heffingsloon
+  − loonbelasting/premie volksverzekeringen
+  = nettoloon
+  + onkostenvergoeding
+  = netto te ontvangen
+```
+
+De loonheffing volgt de witte tabel voor loon uit tegenwoordige dienstbetrekking:
+maandloon × 12 geeft een jaarloon, daarover het schijventarief, dan de algemene
+heffingskorting en de arbeidskorting eraf, en het resultaat gedeeld door 12. De
+tarieven van 2026 staan in [`src/lib/loonheffing.ts`](src/lib/loonheffing.ts);
+voeg daar een nieuw peiljaar toe zodra de Belastingdienst dat publiceert.
+
+Dit maakt zichtbaar dat verlof netto minder kost dan bruto: een lager brutoloon
+betekent ook minder loonheffing. De officiële tabellen werken met loonintervallen,
+dus reken op een afwijking tot ongeveer een euro per maand. Vakantiegeld en
+eenmalige posten blijven buiten beschouwing. Laat je de loonstrookposten leeg, dan
+blijft het bij een bruto-indicatie.
 
 ## De schermen
 
 - **Overzicht** — resterend verlof, inkomen deze maand, en hoeveel dagen je nog
   hebt om vóór de 15e je melding te versturen.
-- **Week invoeren** — het kernscherm. Per dag uren, verlofsoort en kind. "Hele
-  week vullen" en "Vorige week kopiëren" schelen typewerk. Opslaan gebeurt als
-  één transactie: de opgeslagen week is altijd exact wat je op het scherm ziet.
+- **Maand invoeren** — het kernscherm. Alle werkdagen van de maand onder elkaar,
+  gegroepeerd per week. Per dag vul je uren, verlofsoort en kind in. "Hele maand
+  vullen", "Vorige maand kopiëren" en de knoppen ma/di/wo/do/vr (vult die weekdag
+  de hele maand) schelen typewerk. Opslaan gebeurt als één transactie: de
+  opgeslagen maand is altijd exact wat je op het scherm ziet.
 - **Saldo** — per kind per verlofsoort: recht, opgenomen, restant, deadline.
-- **Salaris** — wat je bruto ontvangt in een maand met verlof, en wat je misloopt.
-- **Mail** — genereert een `mailto:`-link met het weekoverzicht voor de komende
+- **Salaris** — de loonstrook van een maand met verlof naast een normale maand,
+  bruto én netto.
+- **Mail** — genereert een `mailto:`-link met alle verlofdagen van de komende
   maand. Bij een te lange mail (mailclients kappen die af) verschijnt in plaats
   daarvan een kopieerknop.
 - **Contracten / Kinderen / Instellingen** — stamgegevens, eigen verlofsoorten en
@@ -110,7 +139,8 @@ npm run db:studio     # database inspecteren
 De rekenkern in [`src/lib/`](src/lib/) is bewust vrij van framework-code en
 volledig getest: `dates.ts` (ISO-weken, kalenderdagen), `contracts.ts`,
 `entitlements.ts` (recht en deadlines), `balances.ts` (saldo en doorschuiven),
-`dagloon.ts` (uitkering en maximumdagloon), `salary.ts` en `mailto.ts`.
+`dagloon.ts` (uitkering en maximumdagloon), `loonheffing.ts` (schijven en
+heffingskortingen), `netsalary.ts` (de loonstrook), `salary.ts` en `mailto.ts`.
 
 Datums worden overal als `yyyy-MM-dd`-string behandeld en in Postgres als `date`
 opgeslagen. Een verlofdag is een kalenderdag, geen tijdstip; daarmee vervalt de
@@ -122,7 +152,7 @@ Handmatige controlescripts (vereisen een draaiende database):
 ```bash
 npx tsx scripts/seed-testdata.ts   # twee contracten met wissel + één kind
 npx tsx scripts/check-flow.ts      # rechten, contractwissel, doorschuiven, mail
-npx tsx scripts/check-saveweek.ts  # weekopslag via de API (dev-server vereist)
+npx tsx scripts/check-saveperiod.ts  # periodeopslag via de API (dev-server vereist)
 ```
 
 Na een schemawijziging: `npm run db:migrate` en `npx prisma generate`.

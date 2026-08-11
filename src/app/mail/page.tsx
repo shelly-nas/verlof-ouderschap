@@ -108,8 +108,8 @@ export default async function MailPage({
       {mail.entryCount === 0 && (
         <Alert tone="info">
           Er staat nog geen verlof in {formatMonthNl(monthStart)}. Voer het in via{" "}
-          <Link href="/week" className="underline">
-            Week invoeren
+          <Link href="/maand" className="underline">
+            Maand invoeren
           </Link>{" "}
           — de mail vult zichzelf dan aan. Je kunt de melding ook zo versturen om te laten
           weten dat je geen verlof opneemt.

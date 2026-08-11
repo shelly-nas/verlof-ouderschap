@@ -185,6 +185,47 @@ describe("monthImpact", () => {
     expect(result.leaveHours).toBe(8);
   });
 
+  it("rekent netto door zodra het contract loonstrookgegevens heeft", () => {
+    const metLoonstrook = {
+      ...contractA,
+      endDate: null,
+      grossMonthlySalary: 5_150,
+      pensionPercent: 7.5,
+      pensionBase: 3_964.33,
+      wgaPercent: 0.144,
+      wgaBase: 5_562,
+      wiaExcedent: 7.79,
+      grossExpenseAllowance: 80,
+      bijtellingPercent: 12,
+      bijtellingBase: 39_865,
+      netExpenseAllowance: 65,
+      applyTaxCredits: true,
+    };
+
+    const zonderVerlof = impact("2026-02", [], [metLoonstrook]);
+    expect(zonderVerlof.net).not.toBeNull();
+    // Heffingsloon en netto van de echte loonstrook.
+    expect(zonderVerlof.net!.normal.taxableIncome).toBeCloseTo(5_315.53, 2);
+    expect(Math.abs(zonderVerlof.net!.normal.netPayout - (3_432.8 + 65))).toBeLessThan(1);
+    expect(zonderVerlof.net!.netDifference).toBeCloseTo(0, 6);
+
+    // Een maand met onbetaald verlof levert netto minder op, maar minder dan bruto.
+    const metVerlof = impact(
+      "2026-02",
+      [entry("2026-02-02", 8, "lt-onbetaald"), entry("2026-02-03", 8, "lt-onbetaald")],
+      [metLoonstrook],
+    );
+    expect(metVerlof.net!.netDifference).toBeLessThan(0);
+    expect(Math.abs(metVerlof.net!.netDifference)).toBeLessThan(
+      Math.abs(metVerlof.difference),
+    );
+  });
+
+  it("laat netto weg zonder loonstrookgegevens", () => {
+    const result = impact("2026-02", [entry("2026-02-02", 8, "lt-betaald")]);
+    expect(result.net).toBeNull();
+  });
+
   it("telt verlofdagen zonder geldig contract apart", () => {
     const result = impact("2024-02", [entry("2024-02-01", 8, "lt-betaald")]);
     expect(result.entriesWithoutContract).toBe(1);

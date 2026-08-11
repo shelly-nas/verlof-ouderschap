@@ -5,6 +5,7 @@ import { type DateOnly, endOfMonth, startOfMonth } from "./dates";
 import type { LeaveTypeLike, SupplementLike } from "./entitlements";
 import { findSupplement } from "./entitlements";
 import type { LeaveEntryLike } from "./balances";
+import { type NetImpact, type PayslipContract, hasPayslipData, netImpact } from "./netsalary";
 
 export type SalaryLineItem = {
   leaveTypeId: string;
@@ -40,6 +41,12 @@ export type MonthImpact = {
   lines: SalaryLineItem[];
   /** Dagen in deze maand zonder geldig contract, met verlof geboekt. */
   entriesWithoutContract: number;
+  /**
+   * Netto-uitwerking, als het contract van deze maand loonstrookgegevens heeft.
+   * Doordat een lager brutoloon ook minder loonheffing betekent, valt het
+   * nettoverschil kleiner uit dan het brutoverschil.
+   */
+  net: NetImpact | null;
 };
 
 /**
@@ -56,7 +63,7 @@ export type MonthImpact = {
 export function monthImpact(params: {
   month: string;
   entries: readonly LeaveEntryLike[];
-  contracts: readonly ContractLike[];
+  contracts: readonly SalaryContract[];
   leaveTypes: readonly LeaveTypeLike[];
   supplements: readonly SupplementLike[];
   maxDaglonen: readonly MaxDagloonRow[];
@@ -145,6 +152,18 @@ export function monthImpact(params: {
   const workedGross = Math.max(0, normalGross - normalGrossForLeaveDays);
   const totalReceived = workedGross + employerPaid + uwvBenefit + employerTopUp;
 
+  // Netto alleen als er loonstrookgegevens zijn; anders blijft het bij bruto.
+  // Het contract dat de meeste dagen van de maand geldt bepaalt de posten.
+  const dominant = dominantContract(month, contracts);
+  const net =
+    dominant && isPayslipContract(dominant) && hasPayslipData(dominant)
+      ? netImpact({
+          contract: dominant,
+          actualGross: totalReceived,
+          year: Number(month.slice(0, 4)),
+        })
+      : null;
+
   return {
     month,
     monthStart,
@@ -163,7 +182,43 @@ export function monthImpact(params: {
       a.leaveTypeName.localeCompare(b.leaveTypeName),
     ),
     entriesWithoutContract,
+    net,
   };
+}
+
+/** Een contract met eventueel de posten van de loonstrook erbij. */
+export type SalaryContract = ContractLike & Partial<PayslipContract>;
+
+/** Heeft dit contract alle velden die de netto-berekening nodig heeft? */
+function isPayslipContract(contract: SalaryContract): contract is ContractLike &
+  PayslipContract {
+  return contract.applyTaxCredits !== undefined;
+}
+
+/** Het contract dat de meeste kalenderdagen van de maand beslaat. */
+function dominantContract<T extends ContractLike>(
+  month: string,
+  contracts: readonly T[],
+): T | null {
+  const monthStart = startOfMonth(`${month}-01`);
+  const monthEnd = endOfMonth(monthStart);
+  const totalDays = Number(monthEnd.slice(8, 10));
+
+  const dayCount = new Map<string, { contract: T; days: number }>();
+  for (let day = 1; day <= totalDays; day += 1) {
+    const date = `${month}-${`${day}`.padStart(2, "0")}` as DateOnly;
+    const contract = contractForDate(contracts, date);
+    if (!contract) continue;
+    const entry = dayCount.get(contract.id) ?? { contract, days: 0 };
+    entry.days += 1;
+    dayCount.set(contract.id, entry);
+  }
+
+  let best: { contract: T; days: number } | null = null;
+  for (const entry of dayCount.values()) {
+    if (!best || entry.days > best.days) best = entry;
+  }
+  return best?.contract ?? null;
 }
 
 /**

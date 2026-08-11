@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { deleteContract, saveContract } from "@/lib/actions";
+import { hasPayslipData } from "@/lib/netsalary";
 import type { ContractDto, LeaveTypeDto } from "@/lib/queries";
 import { Alert, Card, Field, inputClass } from "./ui";
 
@@ -22,6 +23,9 @@ export function ContractForm({
   const [errors, setErrors] = useState<string[]>([]);
   const [showSupplements, setShowSupplements] = useState(
     (contract?.supplements.length ?? 0) > 0,
+  );
+  const [showPayslip, setShowPayslip] = useState(
+    contract !== null && hasPayslipData(contract),
   );
   const [pending, startTransition] = useTransition();
 
@@ -142,6 +146,148 @@ export function ContractForm({
             />
           </Field>
         </div>
+      </Card>
+
+      <Card
+        title="Loonstrook"
+        description="Neem de posten van je loonstrook over; dan rekent de app je nettoloon uit, ook in een maand met verlof. Laat je dit leeg, dan blijft het bij een bruto-indicatie."
+        action={
+          <button
+            type="button"
+            onClick={() => setShowPayslip((value) => !value)}
+            className="rounded-lg border border-[var(--border)] px-3 py-1.5 text-sm"
+          >
+            {showPayslip ? "Verbergen" : "Invullen"}
+          </button>
+        }
+      >
+        {showPayslip ? (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Pensioenpremie (%)" hint="Percentage van de premiegrondslag.">
+              <input
+                name="pensionPercent"
+                type="number"
+                step="0.001"
+                min="0"
+                className={inputClass}
+                defaultValue={contract?.pensionPercent ?? ""}
+                placeholder="7,5"
+              />
+            </Field>
+            <Field label="Premiegrondslag pensioen" hint="Bruto minus de franchise.">
+              <input
+                name="pensionBase"
+                type="number"
+                step="0.01"
+                min="0"
+                className={inputClass}
+                defaultValue={contract?.pensionBase ?? ""}
+                placeholder="3964,33"
+              />
+            </Field>
+
+            <Field label="WGA Hiaat Plus (%)">
+              <input
+                name="wgaPercent"
+                type="number"
+                step="0.001"
+                min="0"
+                className={inputClass}
+                defaultValue={contract?.wgaPercent ?? ""}
+                placeholder="0,144"
+              />
+            </Field>
+            <Field label="Grondslag WGA Hiaat Plus">
+              <input
+                name="wgaBase"
+                type="number"
+                step="0.01"
+                min="0"
+                className={inputClass}
+                defaultValue={contract?.wgaBase ?? ""}
+                placeholder="5562,00"
+              />
+            </Field>
+
+            <Field label="WIA Excedent" hint="Vast bedrag per maand.">
+              <input
+                name="wiaExcedent"
+                type="number"
+                step="0.01"
+                min="0"
+                className={inputClass}
+                defaultValue={contract?.wiaExcedent ?? ""}
+                placeholder="7,79"
+              />
+            </Field>
+            <Field
+              label="Bruto kostentoeslag"
+              hint="Telt mee in het brutoloon en het heffingsloon."
+            >
+              <input
+                name="grossExpenseAllowance"
+                type="number"
+                step="0.01"
+                min="0"
+                className={inputClass}
+                defaultValue={contract?.grossExpenseAllowance ?? ""}
+                placeholder="80,00"
+              />
+            </Field>
+
+            <Field label="Bijtelling (%)" hint="Percentage van de cataloguswaarde.">
+              <input
+                name="bijtellingPercent"
+                type="number"
+                step="0.001"
+                min="0"
+                className={inputClass}
+                defaultValue={contract?.bijtellingPercent ?? ""}
+                placeholder="12"
+              />
+            </Field>
+            <Field label="Cataloguswaarde auto" hint="Jaarbedrag; wordt per maand verdeeld.">
+              <input
+                name="bijtellingBase"
+                type="number"
+                step="0.01"
+                min="0"
+                className={inputClass}
+                defaultValue={contract?.bijtellingBase ?? ""}
+                placeholder="39865,00"
+              />
+            </Field>
+
+            <Field
+              label="Onkostenvergoeding"
+              hint="Netto vergoeding; hierover wordt geen loonheffing berekend."
+            >
+              <input
+                name="netExpenseAllowance"
+                type="number"
+                step="0.01"
+                min="0"
+                className={inputClass}
+                defaultValue={contract?.netExpenseAllowance ?? ""}
+                placeholder="65,00"
+              />
+            </Field>
+
+            <label className="flex items-center gap-2 self-end pb-2 text-sm">
+              <input
+                type="checkbox"
+                name="applyTaxCredits"
+                defaultChecked={contract?.applyTaxCredits ?? true}
+                className="h-4 w-4"
+              />
+              Loonheffingskorting toegepast bij deze werkgever
+            </label>
+          </div>
+        ) : (
+          <p className="text-sm text-[var(--muted)]">
+            Geen loonstrookgegevens ingevuld — de app toont alleen bruto bedragen.
+          </p>
+        )}
       </Card>
 
       <Card

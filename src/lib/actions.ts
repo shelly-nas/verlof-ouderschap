@@ -2,7 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { contractForDate } from "./contracts";
-import { type DateOnly, addDaysOnly, formatDateOnly, startOfIsoWeek } from "./dates";
+import {
+  type DateOnly,
+  addMonthsOnly,
+  endOfMonth,
+  formatDateNl,
+  formatDateOnly,
+  startOfMonth,
+} from "./dates";
 import { prisma } from "./db";
 import { getContracts } from "./queries";
 import {
@@ -10,7 +17,7 @@ import {
   contractSchema,
   formatZodError,
   leaveTypeSchema,
-  weekSaveSchema,
+  periodSaveSchema,
 } from "./validation";
 
 export type ActionResult =
@@ -21,12 +28,17 @@ function toDbDate(value: DateOnly): Date {
   return new Date(`${value}T00:00:00.000Z`);
 }
 
+/** Prisma neemt Decimal-velden als string aan; null blijft null. */
+function decimalOrNull(value: number | null): string | null {
+  return value === null ? null : String(value);
+}
+
 function fail(errors: string[]): ActionResult {
   return { ok: false, errors };
 }
 
 function revalidateAll() {
-  for (const path of ["/", "/week", "/saldo", "/salaris", "/mail", "/contracten", "/kinderen"]) {
+  for (const path of ["/", "/maand", "/saldo", "/salaris", "/mail", "/contracten", "/kinderen"]) {
     revalidatePath(path, "layout");
   }
 }
@@ -57,6 +69,16 @@ export async function saveContract(
     startDate: formValue(form, "startDate") ?? "",
     endDate: formValue(form, "endDate") ?? "",
     notes: formValue(form, "notes"),
+    pensionPercent: formValue(form, "pensionPercent"),
+    pensionBase: formValue(form, "pensionBase"),
+    wgaPercent: formValue(form, "wgaPercent"),
+    wgaBase: formValue(form, "wgaBase"),
+    wiaExcedent: formValue(form, "wiaExcedent"),
+    grossExpenseAllowance: formValue(form, "grossExpenseAllowance"),
+    bijtellingPercent: formValue(form, "bijtellingPercent"),
+    bijtellingBase: formValue(form, "bijtellingBase"),
+    netExpenseAllowance: formValue(form, "netExpenseAllowance"),
+    applyTaxCredits: formBool(form, "applyTaxCredits"),
     supplements: leaveTypeIds
       .map((leaveTypeId) => ({
         leaveTypeId,
@@ -87,6 +109,16 @@ export async function saveContract(
     startDate: toDbDate(data.startDate),
     endDate: data.endDate ? toDbDate(data.endDate) : null,
     notes: data.notes,
+    pensionPercent: decimalOrNull(data.pensionPercent),
+    pensionBase: decimalOrNull(data.pensionBase),
+    wgaPercent: decimalOrNull(data.wgaPercent),
+    wgaBase: decimalOrNull(data.wgaBase),
+    wiaExcedent: decimalOrNull(data.wiaExcedent),
+    grossExpenseAllowance: decimalOrNull(data.grossExpenseAllowance),
+    bijtellingPercent: decimalOrNull(data.bijtellingPercent),
+    bijtellingBase: decimalOrNull(data.bijtellingBase),
+    netExpenseAllowance: decimalOrNull(data.netExpenseAllowance),
+    applyTaxCredits: data.applyTaxCredits,
   };
 
   const saved = await prisma.$transaction(async (tx) => {
@@ -198,7 +230,7 @@ export async function deleteChild(childId: string): Promise<ActionResult> {
 
 // Weekregistratie
 
-export type WeekRowInput = {
+export type LeaveRowInput = {
   date: DateOnly;
   childId: string;
   leaveTypeId: string;
@@ -207,45 +239,46 @@ export type WeekRowInput = {
 };
 
 /**
- * Slaat een hele week in één transactie op.
+ * Slaat alle verlofdagen in een periode in één transactie op.
  *
- * De client stuurt de gewenste eindtoestand van de week; de server bepaalt het
- * verschil met wat er staat en voert dat uit. Dat is idempotent: opnieuw
- * versturen levert dezelfde week op, en een mislukte opslag laat geen halve week
- * achter. Het contract per regel wordt hier bepaald op basis van de datum, niet
- * door de client meegestuurd.
+ * De client stuurt de gewenste eindtoestand van de periode; de server bepaalt
+ * het verschil met wat er staat en voert dat uit. Dat is idempotent: opnieuw
+ * versturen levert dezelfde periode op, en een mislukte opslag laat geen halve
+ * maand achter. Het contract per regel wordt hier bepaald op basis van de datum
+ * van die regel, niet door de client meegestuurd — zo klopt een periode die
+ * over een contractwissel heen loopt.
  */
-export async function saveWeek(
-  weekStart: DateOnly,
-  rows: WeekRowInput[],
+export async function savePeriod(
+  from: DateOnly,
+  to: DateOnly,
+  rows: LeaveRowInput[],
 ): Promise<ActionResult> {
-  const parsed = weekSaveSchema.safeParse({ weekStart, rows });
+  const parsed = periodSaveSchema.safeParse({ from, to, rows });
   if (!parsed.success) return fail(formatZodError(parsed.error));
 
-  const monday = startOfIsoWeek(parsed.data.weekStart);
-  const sunday = addDaysOnly(monday, 6);
   const contracts = await getContracts();
-
   const errors: string[] = [];
-  const keep = new Map<string, WeekRowInput & { contractId: string }>();
+  const keep = new Map<string, LeaveRowInput & { contractId: string }>();
 
   for (const row of parsed.data.rows) {
-    if (row.date < monday || row.date > sunday) {
-      errors.push(`${row.date} valt buiten de week van ${monday}.`);
+    if (row.date < parsed.data.from || row.date > parsed.data.to) {
+      errors.push(`${formatDateNl(row.date)} valt buiten de gekozen periode.`);
       continue;
     }
     if (row.hours <= 0) continue;
 
     const contract = contractForDate(contracts, row.date);
     if (!contract) {
-      errors.push(`Geen contract gevonden voor ${row.date}. Voeg eerst een contract toe.`);
+      errors.push(
+        `Geen contract gevonden voor ${formatDateNl(row.date)}. Voeg eerst een contract toe.`,
+      );
       continue;
     }
 
     const key = `${row.date}|${row.childId}|${row.leaveTypeId}`;
     if (keep.has(key)) {
       errors.push(
-        `Dubbele regel voor ${row.date}: combineer de uren van dezelfde verlofsoort en hetzelfde kind.`,
+        `Dubbele regel voor ${formatDateNl(row.date)}: combineer de uren van dezelfde verlofsoort en hetzelfde kind.`,
       );
       continue;
     }
@@ -256,7 +289,9 @@ export async function saveWeek(
 
   await prisma.$transaction(async (tx) => {
     const existing = await tx.leaveEntry.findMany({
-      where: { date: { gte: toDbDate(monday), lte: toDbDate(sunday) } },
+      where: {
+        date: { gte: toDbDate(parsed.data.from), lte: toDbDate(parsed.data.to) },
+      },
     });
 
     for (const entry of existing) {
@@ -294,35 +329,60 @@ export async function saveWeek(
   });
 
   revalidateAll();
-  return { ok: true, message: "Week opgeslagen." };
+  return { ok: true, message: "Opgeslagen." };
 }
 
-/** Kopieert de vorige week naar deze week; bestaande regels worden vervangen. */
-export async function copyPreviousWeek(weekStart: DateOnly): Promise<ActionResult> {
-  const monday = startOfIsoWeek(weekStart);
-  const previousMonday = addDaysOnly(monday, -7);
-  const previousSunday = addDaysOnly(monday, -1);
+/** Slaat een hele maand op. `month` heeft de vorm "2026-08". */
+export async function saveMonth(
+  month: string,
+  rows: LeaveRowInput[],
+): Promise<ActionResult> {
+  if (!/^\d{4}-\d{2}$/.test(month)) {
+    return fail([`"${month}" is geen geldige maand (verwacht jjjj-mm).`]);
+  }
+  const start = startOfMonth(`${month}-01`);
+  return savePeriod(start, endOfMonth(start), rows);
+}
+
+/** Kopieert de vorige maand naar deze maand; bestaande regels worden vervangen. */
+export async function copyPreviousMonth(month: string): Promise<ActionResult> {
+  if (!/^\d{4}-\d{2}$/.test(month)) {
+    return fail([`"${month}" is geen geldige maand (verwacht jjjj-mm).`]);
+  }
+
+  const start = startOfMonth(`${month}-01`);
+  const previousStart = addMonthsOnly(start, -1);
+  const previousEnd = endOfMonth(previousStart);
 
   const previous = await prisma.leaveEntry.findMany({
-    where: { date: { gte: toDbDate(previousMonday), lte: toDbDate(previousSunday) } },
+    where: { date: { gte: toDbDate(previousStart), lte: toDbDate(previousEnd) } },
   });
 
   if (previous.length === 0) {
-    return fail(["De vorige week bevat geen verlof om te kopiëren."]);
+    return fail(["De vorige maand bevat geen verlof om te kopiëren."]);
   }
 
-  const rows: WeekRowInput[] = previous.map((entry) => {
-    const date = formatDateOnly(entry.date);
-    return {
-      date: addDaysOnly(date, 7),
+  // Dezelfde dag-van-de-maand aanhouden; dagen die in deze maand niet bestaan
+  // (31 januari naar februari) vallen af.
+  const daysInMonth = Number(endOfMonth(start).slice(8, 10));
+  const rows: LeaveRowInput[] = [];
+  for (const entry of previous) {
+    const day = Number(formatDateOnly(entry.date).slice(8, 10));
+    if (day > daysInMonth) continue;
+    rows.push({
+      date: `${month}-${`${day}`.padStart(2, "0")}`,
       childId: entry.childId,
       leaveTypeId: entry.leaveTypeId,
       hours: Number(entry.hours.toString()),
       note: entry.note,
-    };
-  });
+    });
+  }
 
-  return saveWeek(monday, rows);
+  if (rows.length === 0) {
+    return fail(["De vorige maand bevat geen dagen die in deze maand passen."]);
+  }
+
+  return saveMonth(month, rows);
 }
 
 // Verlofsoorten en maximumdaglonen

@@ -71,6 +71,46 @@ export const contractSchema = z
     startDate: dateOnly,
     endDate: optionalDateOnly,
     notes: optionalText,
+
+    // Loonstrookposten; leeg laten betekent dat de app alleen bruto rekent.
+    pensionPercent: optionalNumber.refine(
+      (value) => value === null || (value >= 0 && value <= 100),
+      "Pensioenpremie moet tussen 0% en 100% liggen",
+    ),
+    pensionBase: optionalNumber.refine(
+      (value) => value === null || value >= 0,
+      "Grondslag kan niet negatief zijn",
+    ),
+    wgaPercent: optionalNumber.refine(
+      (value) => value === null || (value >= 0 && value <= 100),
+      "WGA-percentage moet tussen 0% en 100% liggen",
+    ),
+    wgaBase: optionalNumber.refine(
+      (value) => value === null || value >= 0,
+      "Grondslag kan niet negatief zijn",
+    ),
+    wiaExcedent: optionalNumber.refine(
+      (value) => value === null || value >= 0,
+      "Bedrag kan niet negatief zijn",
+    ),
+    grossExpenseAllowance: optionalNumber.refine(
+      (value) => value === null || value >= 0,
+      "Bedrag kan niet negatief zijn",
+    ),
+    bijtellingPercent: optionalNumber.refine(
+      (value) => value === null || (value >= 0 && value <= 100),
+      "Bijtelling moet tussen 0% en 100% liggen",
+    ),
+    bijtellingBase: optionalNumber.refine(
+      (value) => value === null || value >= 0,
+      "Cataloguswaarde kan niet negatief zijn",
+    ),
+    netExpenseAllowance: optionalNumber.refine(
+      (value) => value === null || value >= 0,
+      "Bedrag kan niet negatief zijn",
+    ),
+    applyTaxCredits: z.boolean().default(true),
+
     supplements: z.array(supplementSchema).default([]),
   })
   .refine(
@@ -113,8 +153,8 @@ export const leaveTypeSchema = z
     { message: "Vul een termijn in of kies 'geen deadline'", path: ["deadlineValue"] },
   );
 
-/** Eén regel in het weekscherm. hours = 0 betekent: verwijder deze regel. */
-export const weekEntrySchema = z.object({
+/** Eén verlofregel. hours = 0 betekent: verwijder deze regel. */
+export const leaveEntrySchema = z.object({
   date: dateOnly,
   childId: z.string().min(1, "Kies een kind"),
   leaveTypeId: z.string().min(1, "Kies een verlofsoort"),
@@ -125,15 +165,21 @@ export const weekEntrySchema = z.object({
   note: optionalText.optional(),
 });
 
-export const weekSaveSchema = z.object({
-  weekStart: dateOnly,
-  rows: z.array(weekEntrySchema),
-});
+export const periodSaveSchema = z
+  .object({
+    from: dateOnly,
+    to: dateOnly,
+    rows: z.array(leaveEntrySchema),
+  })
+  .refine((value) => value.to >= value.from, {
+    message: "De einddatum ligt vóór de startdatum",
+    path: ["to"],
+  });
 
 export type ContractInput = z.infer<typeof contractSchema>;
 export type ChildInput = z.infer<typeof childSchema>;
 export type LeaveTypeInput = z.infer<typeof leaveTypeSchema>;
-export type WeekSaveInput = z.infer<typeof weekSaveSchema>;
+export type PeriodSaveInput = z.infer<typeof periodSaveSchema>;
 
 /** Zet een zod-fout om naar een platte lijst meldingen voor de UI. */
 export function formatZodError(error: z.ZodError): string[] {

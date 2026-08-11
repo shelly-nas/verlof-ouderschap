@@ -5,6 +5,7 @@ import type { MaxDagloonRow } from "./dagloon";
 import { prisma } from "./db";
 import type { ChildLike, LeaveTypeLike, SupplementLike } from "./entitlements";
 import type { LeaveEntryLike } from "./balances";
+import type { PayslipContract } from "./netsalary";
 import { type DecimalLike, toNumber, toNumberOrNull } from "./money";
 
 /**
@@ -21,10 +22,11 @@ function dateOnlyOrNull(value: Date | null): DateOnly | null {
   return value === null ? null : formatDateOnly(value);
 }
 
-export type ContractDto = ContractLike & {
-  notes: string | null;
-  supplements: SupplementDto[];
-};
+export type ContractDto = ContractLike &
+  PayslipContract & {
+    notes: string | null;
+    supplements: SupplementDto[];
+  };
 
 export type SupplementDto = SupplementLike & {
   id: string;
@@ -57,6 +59,16 @@ type PrismaContract = {
   startDate: Date;
   endDate: Date | null;
   notes: string | null;
+  pensionPercent: DecimalLike;
+  pensionBase: DecimalLike;
+  wgaPercent: DecimalLike;
+  wgaBase: DecimalLike;
+  wiaExcedent: DecimalLike;
+  grossExpenseAllowance: DecimalLike;
+  bijtellingPercent: DecimalLike;
+  bijtellingBase: DecimalLike;
+  netExpenseAllowance: DecimalLike;
+  applyTaxCredits: boolean;
   supplements?: PrismaSupplement[];
 };
 
@@ -81,6 +93,16 @@ export function toContractDto(row: PrismaContract): ContractDto {
     startDate: dateOnly(row.startDate),
     endDate: dateOnlyOrNull(row.endDate),
     notes: row.notes,
+    pensionPercent: toNumberOrNull(row.pensionPercent),
+    pensionBase: toNumberOrNull(row.pensionBase),
+    wgaPercent: toNumberOrNull(row.wgaPercent),
+    wgaBase: toNumberOrNull(row.wgaBase),
+    wiaExcedent: toNumberOrNull(row.wiaExcedent),
+    grossExpenseAllowance: toNumberOrNull(row.grossExpenseAllowance),
+    bijtellingPercent: toNumberOrNull(row.bijtellingPercent),
+    bijtellingBase: toNumberOrNull(row.bijtellingBase),
+    netExpenseAllowance: toNumberOrNull(row.netExpenseAllowance),
+    applyTaxCredits: row.applyTaxCredits,
     supplements: (row.supplements ?? []).map(toSupplementDto),
   };
 }
