@@ -1,20 +1,21 @@
 # Production stack.
 #
-# IMAGE_TAG is the released version (1.2.3) and is written into .env by the
-# deploy workflow. Pinning it rather than tracking 'latest' is what makes a
-# rollback a change of one line here instead of a rebuild, and what keeps a
-# container restart from silently pulling a newer build.
+# IMAGE_TAG is the commit on main that is deployed, written into .env by the
+# deploy workflow. Pinning it rather than tracking 'latest' keeps a container
+# restart from silently pulling a newer build, and makes a rollback deploying
+# an earlier commit.
 #
-# The schema is created by database/init.sql on the first start of an empty
-# volume. Once this is running with data in it, a schema change can no longer go
-# there: add a migration under server/migrations/ instead, which the server
-# applies on startup.
+# The database lives in the external volume verlof-ouderschap_pgdata (see the
+# bottom of this file). The schema is created by database/init.sql on the first start of
+# that empty volume. Once it holds data, a schema change can no longer go there:
+# add a migration under server/migrations/ instead, which the server applies
+# on startup.
 services:
   db:
     # Eigen image: het schema zit erin gebakken, omdat de deploy alleen dit
     # compose-bestand naar de host kopieert en een bind mount naar
     # ./database/ daar niet bestaat.
-    image: ${REGISTRY}/verlof-ouderschap-db:${IMAGE_TAG:?IMAGE_TAG is verplicht - zet een versie, niet latest}
+    image: ${REGISTRY}/verlof-ouderschap-db:${IMAGE_TAG:?IMAGE_TAG is verplicht - zet een commit, niet latest}
     container_name: verlof-ouderschap-db
     restart: always
     environment:
@@ -23,11 +24,9 @@ services:
       POSTGRES_DB: ${DB_NAME:-verlof}
       TZ: ${TZ:-Europe/Amsterdam}
     volumes:
-      # Bind mount: de data leeft op de host onder ./data/postgres en overleeft
-      # daarmee ook `docker compose down -v`, dat named volumes wist.
-      # Het pad moet op de host bestaan en eigendom zijn van uid/gid 70
-      # (de postgres-user in het alpine-image), anders weigert Postgres te starten.
-      - ./data/postgres:/var/lib/postgresql/data
+      # Extern volume: de productiedata blijft staan bij elke deploy, ook bij
+      # `docker compose down -v`. Zie `volumes:` onderaan.
+      - db_data:/var/lib/postgresql/data
     healthcheck:
       test:
         ["CMD-SHELL", "pg_isready -U ${DB_USER:-verlof} -d ${DB_NAME:-verlof}"]
@@ -37,7 +36,7 @@ services:
       start_period: 10s
 
   server:
-    image: ${REGISTRY}/verlof-ouderschap-server:${IMAGE_TAG:?IMAGE_TAG is verplicht - zet een versie, niet latest}
+    image: ${REGISTRY}/verlof-ouderschap-server:${IMAGE_TAG:?IMAGE_TAG is verplicht - zet een commit, niet latest}
     container_name: verlof-ouderschap-server
     restart: always
     environment:
@@ -47,6 +46,8 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ${DB_NAME:-verlof}
       SERVER_PORT: 3000
+      # De commit die draait; GET /api/health meldt hem als versie.
+      APP_VERSION: ${IMAGE_TAG}
       TZ: ${TZ:-Europe/Amsterdam}
       NODE_ENV: production
     depends_on:
@@ -79,7 +80,7 @@ services:
       - "traefik.http.services.verlof-api.loadbalancer.server.port=3000"
 
   client:
-    image: ${REGISTRY}/verlof-ouderschap-client:${IMAGE_TAG:?IMAGE_TAG is verplicht - zet een versie, niet latest}
+    image: ${REGISTRY}/verlof-ouderschap-client:${IMAGE_TAG:?IMAGE_TAG is verplicht - zet een commit, niet latest}
     container_name: verlof-ouderschap-client
     restart: always
     environment:
@@ -101,3 +102,17 @@ services:
 networks:
   shelly-network:
     external: true
+
+volumes:
+  # De productiedatabase. Extern, met een vaste naam: compose maakt hem niet
+  # aan en verwijdert hem nooit, ook niet met `docker compose down -v`, en de
+  # opschoonstappen van de shared-workflows laten hem staan. deploy.yml geeft
+  # dezelfde naam mee als `persistent_volumes`; deploy-production.yml maakt het
+  # volume bij de eerste deploy aan en hergebruikt het daarna. Weggooien kan
+  # alleen bewust: `docker volume rm verlof-ouderschap_pgdata`.
+  #
+  # verlof-ouderschap_pgdata is het volume waarin de eerdere Next.js-versie van
+  # deze app haar data al bewaarde; zo gaat die data zonder kopiëren mee.
+  db_data:
+    external: true
+    name: verlof-ouderschap_pgdata

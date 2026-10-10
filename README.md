@@ -7,8 +7,8 @@ knop een verlofmelding naar je werkgever mailen.
 De app volgt de shelly-nas standaarden uit
 [`shelly-nas/shelly-fundamentals`](https://github.com/shelly-nas/shelly-fundamentals):
 React + Vite + MUI in `client/`, Node + Express in `server/`, PostgreSQL 16 in
-`database/`, het Web App Template als huisstijl, en release-please met een
-acceptatieomgeving per pull request.
+`database/`, het Web App Template als huisstijl, een acceptatieomgeving per pull
+request en een deploy naar productie bij elke merge.
 
 | Omgeving | Adres |
 |---|---|
@@ -44,7 +44,7 @@ server/     Express-API op poort 3000, alles onder /api
   src/domain/   de rekenkern: rechten, saldo, dagloon, loonheffing, netto, mail
   src/repo.ts   alle SQL (geen ORM)
   src/app.ts    de routes; elk scherm haalt één kant-en-klaar antwoord op
-  migrations/   leeg tot 1.0.0, zie de README daar
+  migrations/   schemawijzigingen op de productiedatabase, zie de README daar
 database/   init.sql (schema), seed.sql (verlofsoorten), seed-demo.sql (alleen lokaal/acc)
 ```
 
@@ -126,53 +126,48 @@ cd server && npm test   # rekenkern; met DB_* naar een lege database ook de API-
 cd client && npm test   # kalenderlogica en datumnotatie
 ```
 
-Commitberichten zijn [Conventional Commits](CLAUDE.md#commitberichten):
-release-please leidt er de versie uit af.
+Commitberichten zijn [Conventional Commits](CLAUDE.md#commitberichten): elke
+merge naar `main` gaat direct live, en de geschiedenis van `main` laat zo zien
+wat elke deploy deed.
 
-## Release en deploy
+## Deploy
 
-1. Elke PR naar `main` komt op **verlof-acc.shelly-nas.nl**, met een verse
-   database met demodata.
-2. Na het mergen houdt release-please een PR "chore(main): release x.y.z" bij.
-3. Het mergen van die release-PR bouwt de images met dat versienummer en
-   deployt ze naar productie.
+1. Werk op een branch en open een PR naar `main`. Elke push daarop komt op
+   **verlof-acc.shelly-nas.nl**, met een verse database met demodata.
+2. **Mergen is releasen:** elke push naar `main` bouwt de images (getagd met de
+   commit) en deployt ze direct naar **verlof.shelly-nas.nl**. `GET /api/health`
+   meldt de commit die draait.
+3. Acc wordt afgebroken zodra de PR sluit.
 
-Terugrollen: *Actions → Release, Build & Deploy → Run workflow* met een eerder
-uitgebrachte versie.
+Opnieuw deployen of terugrollen: *Actions → Build & Deploy to Production → Run
+workflow* op `main` of op een branch of tag met een eerdere commit (of revert de
+commit en merge de revert).
+
+### Productiedata
+
+De productiedatabase staat in het externe Docker-volume
+**`verlof-ouderschap_pgdata`**: het volume waarin de eerdere Next.js-versie van
+de app haar data al bewaarde, dus die data gaat zonder kopiëren mee.
+
+- De deploy maakt het volume alleen aan als het ontbreekt (`persistent_volumes`
+  in `deploy.yml`) en verwijdert het nooit. Elke deploy, dus elke merge naar
+  `main`, start de nieuwe containers op hetzelfde volume.
+- Compose beheert een extern volume niet: `docker compose down -v` laat het
+  staan, net als de opschoonstappen van de shared-workflows.
+- Weggooien kan alleen bewust: `docker volume rm verlof-ouderschap_pgdata`.
+
+De eerste deploy van deze versie ruimt ook de oude `app`-container van de
+Next.js-versie op (`--remove-orphans`), zodat die niet naast de nieuwe stack
+blijft draaien.
 
 ### Eenmalig in de GitHub-repo
 
-- *Settings → Secrets and variables → Actions*: variables `REGISTRY_URL` en
-  `REGISTRY_USERNAME`; secrets `REGISTRY_PASSWORD` en het databasewachtwoord.
-  De workflows lezen `DB_PASSWORD`, `DB_USER` en `DB_NAME`, en vallen terug op de
-  oude namen `POSTGRES_PASSWORD`, `POSTGRES_USER` en `POSTGRES_DB` (gebruiker en
-  database standaard `verlof`). Het bestaande `POSTGRES_PASSWORD` volstaat dus en
-  past bij de bestaande data.
-- *Settings → Actions → General*: "Allow GitHub Actions to create and approve
-  pull requests" aan.
-
-### Eenmalig op de NAS: bestaande data overzetten
-
-De vorige versie (Next.js + Prisma) bewaarde de database in het named volume
-`verlof-ouderschap_pgdata`. Productie gebruikt nu een bind mount op
-`./data/postgres`. Het schema is ongewijzigd, dus de data kan één op één mee.
-Doe dit **vóór** het mergen van de eerste release-PR, anders start productie
-met een lege database:
-
-```bash
-cd /volume1/docker/verlof-ouderschap
-docker compose down                                  # stopt de oude app en db
-mkdir -p data/postgres
-docker run --rm \
-  -v verlof-ouderschap_pgdata:/from:ro \
-  -v "$PWD/data/postgres":/to \
-  alpine sh -c 'cp -a /from/. /to/ && chown -R 70:70 /to'
-```
-
-Beide versies draaien op `postgres:16-alpine`, dus de datamap past direct. Het
-oude volume blijft staan tot je het zelf verwijdert
-(`docker volume rm verlof-ouderschap_pgdata`) — doe dat pas als productie
-goed draait.
+*Settings → Secrets and variables → Actions*: variables `REGISTRY_URL` en
+`REGISTRY_USERNAME`; secrets `REGISTRY_PASSWORD` en het databasewachtwoord. De
+workflows lezen `DB_PASSWORD`, `DB_USER` en `DB_NAME`, en vallen terug op de
+oude namen `POSTGRES_PASSWORD`, `POSTGRES_USER` en `POSTGRES_DB` (gebruiker en
+database standaard `verlof`). Het bestaande `POSTGRES_PASSWORD` volstaat dus en
+past bij de bestaande data.
 
 Let op: er zit geen login op de app. Hij is alleen bedoeld voor het eigen
 netwerk achter Traefik.

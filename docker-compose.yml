@@ -35,8 +35,8 @@ services:
       POSTGRES_DB: ${DB_NAME:-verlof}
     volumes:
       - db_data:/var/lib/postgresql/data
-      # Draait alleen bij een leeg volume, in bestandsvolgorde. Zodra 1.0.0
-      # ergens met data draait, moet een schemawijziging een migratie worden -
+      # Draait alleen bij een leeg volume, in bestandsvolgorde. Zodra de app in
+      # productie met data draait, moet een schemawijziging een migratie worden -
       # dit script wordt op een bestaand volume nooit opnieuw uitgevoerd.
       - ./database/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
       - ./database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro

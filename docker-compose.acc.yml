@@ -11,7 +11,9 @@
 # database/seed-demo.sql. No production data reaches acc.
 #
 # Keep this file in step with docker-compose.prod.yml; the only differences
-# should be names, host and this header.
+# should be names, host, this header and the database storage: acc uses the
+# bind mount ./data/postgres, which the deploy empties every time, where
+# production uses its external volume.
 services:
   db:
     # Eigen image: het schema zit erin gebakken, omdat de deploy alleen dit
@@ -26,10 +28,9 @@ services:
       POSTGRES_DB: ${DB_NAME:-verlof}
       TZ: ${TZ:-Europe/Amsterdam}
     volumes:
-      # Bind mount: de data leeft op de host onder ./data/postgres en overleeft
-      # daarmee ook `docker compose down -v`, dat named volumes wist.
-      # Het pad moet op de host bestaan en eigendom zijn van uid/gid 70
-      # (de postgres-user in het alpine-image), anders weigert Postgres te starten.
+      # Bind mount, alleen op acc: deploy-acceptance.yml maakt ./data/postgres
+      # bij elke deploy leeg (eigenaar uid/gid 70, de postgres-user in het
+      # alpine-image), zodat acc altijd met een verse database start.
       - ./data/postgres:/var/lib/postgresql/data
     healthcheck:
       test:
@@ -50,6 +51,8 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ${DB_NAME:-verlof}
       SERVER_PORT: 3000
+      # De commit die draait; GET /api/health meldt hem als versie.
+      APP_VERSION: ${IMAGE_TAG}
       TZ: ${TZ:-Europe/Amsterdam}
       NODE_ENV: production
     depends_on:

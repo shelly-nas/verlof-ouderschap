@@ -29,9 +29,10 @@ import {
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
-export const version: string = JSON.parse(
-  readFileSync(path.resolve(__dirname, "..", "package.json"), "utf8"),
-).version;
+/** De gedeployde commit (APP_VERSION uit compose), lokaal de versie uit package.json. */
+export const version: string =
+  process.env.APP_VERSION ||
+  JSON.parse(readFileSync(path.resolve(__dirname, "..", "package.json"), "utf8")).version;
 
 function send<T>(res: Response, result: ActionResult<T>) {
   if (result.ok) {
