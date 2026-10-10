@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="nl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Ouderschapsverlof, saldo en salarisimpact bijhouden" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>Verlofregistratie</title>
+    <script>
+      // Thema vóór de eerste paint, zodat er geen lichte flits is in dark mode.
+      try {
+        var stored = localStorage.getItem("theme-mode");
+        var dark = stored ? stored === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+        document.documentElement.className = dark ? "theme-dark" : "theme-light";
+        document.documentElement.style.background = dark ? "#0F1217" : "#F8F9FB";
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

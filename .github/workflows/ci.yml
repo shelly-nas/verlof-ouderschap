@@ -1,0 +1,28 @@
+name: CI
+
+# Runs on every change: each push to any branch and every pull request, so a
+# problem surfaces before it reaches main rather than at deploy time. The steps
+# live in shared-workflows' ci-node-postgres.yml; only what is specific to this app is
+# passed in.
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+# A newer push to the same branch supersedes the run in progress.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    name: CI
+    uses: shelly-nas/shared-workflows/.github/workflows/ci-node-postgres.yml@main
+    with:
+      db_user: verlof
+      db_name: verlof
+      # A table the seed fills. Re-running the seed must leave its row count
+      # unchanged; leave empty to only check that the seed does not fail.
+      seed_check_table: '"LeaveType"'
+      migrate_command: >-
+        node -e "require('./dist/migrations').runMigrations().then(() => process.exit(0)).catch((e) => { console.error(e); process.exit(1); })"

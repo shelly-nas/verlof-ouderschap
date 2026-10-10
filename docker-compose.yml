@@ -1,42 +1,55 @@
 services:
-  db:
-    image: postgres:16-alpine
-    restart: unless-stopped
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER:-verlof}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-verlof}
-      POSTGRES_DB: ${POSTGRES_DB:-verlof}
-      TZ: ${TZ:-Europe/Amsterdam}
-    ports:
-      - "5432:5432"
-    volumes:
-      - pgdata-dev:/var/lib/postgresql/data
-    healthcheck:
-      test:
-        ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-verlof} -d ${POSTGRES_DB:-verlof}"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
-  app:
+  client: # Frontend service (nginx serving the built Vite app)
     build:
-      context: .
-      dockerfile: Dockerfile.dev
-    restart: unless-stopped
-    environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-verlof}:${POSTGRES_PASSWORD:-verlof}@db:5432/${POSTGRES_DB:-verlof}?schema=public
-      TZ: ${TZ:-Europe/Amsterdam}
-      WATCHPACK_POLLING: "true"
+      context: ./client
+      dockerfile: Dockerfile
     ports:
-      - "3000:3000"
+      - "5173:80"  # Browse the app at http://localhost:5173
+    depends_on:
+      - server
+
+  server: # Backend service
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"  # API only - there is no page at http://localhost:3000/
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-verlof}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD ontbreekt - zet hem in .env}
+      DB_NAME: ${DB_NAME:-verlof}
+      SERVER_PORT: 3000
     depends_on:
       db:
         condition: service_healthy
+
+  db: # PostgreSQL database
+    image: postgres:16-alpine  # Pinned: `latest` breaks an existing data volume on a major upgrade
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${DB_USER:-verlof}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD ontbreekt - zet hem in .env}
+      POSTGRES_DB: ${DB_NAME:-verlof}
     volumes:
-      - .:/app
-      # De host mag de installatie en build-cache in de container niet overschrijven.
-      - /app/node_modules
-      - /app/.next
+      - db_data:/var/lib/postgresql/data
+      # Draait alleen bij een leeg volume, in bestandsvolgorde. Zodra 1.0.0
+      # ergens met data draait, moet een schemawijziging een migratie worden -
+      # dit script wordt op een bestaand volume nooit opnieuw uitgevoerd.
+      - ./database/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./database/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+      # Alleen lokaal: demodata om tegen te testen. Staat bewust niet in
+      # database/Dockerfile, dus productie krijgt dit bestand nooit.
+      - ./database/seed-demo.sql:/docker-entrypoint-initdb.d/03-seed-demo.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-verlof} -d ${DB_NAME:-verlof}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
 volumes:
-  pgdata-dev:
+  db_data:
+    driver: local
