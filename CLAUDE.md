@@ -11,7 +11,7 @@ Is de plugin niet geladen, dan gelden in elk geval deze regels:
 - **Lokaal:** `docker-compose.yml` bouwt vanuit de broncode. **Productie:** `docker-compose.prod.yml`
   gebruikt alleen images met een gepinde `IMAGE_TAG` (de commit), achter Traefik op `shelly-network`, op
   `verlof.shelly-nas.nl`. Elke merge naar `main` deployt direct naar productie.
-- **Productiedata** staat in het externe Docker-volume `verlof-ouderschap-db-data`. Een deploy maakt het aan als het
+- **Productiedata** staat in het externe Docker-volume `verlof-ouderschap_pgdata` (het volume van de eerdere Next.js-versie). Een deploy maakt het aan als het
   ontbreekt en verwijdert het nooit; zet de naam in `docker-compose.prod.yml` en `persistent_volumes` in `deploy.yml`.
 - **Acc:** elke PR naar `main` wordt gedeployd naar `verlof-acc.shelly-nas.nl` via
   `docker-compose.acc.yml` en `.github/workflows/acc.yml`, met een verse database met demodata, en
