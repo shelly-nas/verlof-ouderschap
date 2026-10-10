@@ -86,8 +86,10 @@ jobs:
     secrets:
       registry_username: ${{ vars.REGISTRY_USERNAME }}
       registry_password: ${{ secrets.REGISTRY_PASSWORD }}
+      # Falls back to the POSTGRES_* names the Next.js version of this app used,
+      # so the password stays the one the existing data was created with.
       env_file_content: |
-        DB_NAME=${{ vars.DB_NAME }}
-        DB_USER=${{ vars.DB_USER }}
-        DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+        DB_NAME=${{ vars.DB_NAME || vars.POSTGRES_DB || 'verlof' }}
+        DB_USER=${{ vars.DB_USER || vars.POSTGRES_USER || 'verlof' }}
+        DB_PASSWORD=${{ secrets.DB_PASSWORD || secrets.POSTGRES_PASSWORD }}
         TZ=${{ vars.TZ || 'Europe/Amsterdam' }}

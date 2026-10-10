@@ -142,11 +142,12 @@ uitgebrachte versie.
 
 ### Eenmalig in de GitHub-repo
 
-- *Settings → Secrets and variables → Actions*: variables `REGISTRY_URL`,
-  `REGISTRY_USERNAME`, `DB_USER` (`verlof`), `DB_NAME` (`verlof`); secrets
-  `REGISTRY_PASSWORD` en `DB_PASSWORD`. De oude variabelen `POSTGRES_*` zijn
-  niet meer nodig; zet `DB_PASSWORD` op de waarde van het oude
-  `POSTGRES_PASSWORD`, anders past het wachtwoord niet bij de bestaande data.
+- *Settings → Secrets and variables → Actions*: variables `REGISTRY_URL` en
+  `REGISTRY_USERNAME`; secrets `REGISTRY_PASSWORD` en het databasewachtwoord.
+  De workflows lezen `DB_PASSWORD`, `DB_USER` en `DB_NAME`, en vallen terug op de
+  oude namen `POSTGRES_PASSWORD`, `POSTGRES_USER` en `POSTGRES_DB` (gebruiker en
+  database standaard `verlof`). Het bestaande `POSTGRES_PASSWORD` volstaat dus en
+  past bij de bestaande data.
 - *Settings → Actions → General*: "Allow GitHub Actions to create and approve
   pull requests" aan.
 
