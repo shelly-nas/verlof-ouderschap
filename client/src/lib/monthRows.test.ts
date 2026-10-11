@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { Balance, LeaveEntry } from "../api/types";
-import { fillMonth, fillWeekday, isDirty, projectBalances, setHours, toggleDay } from "./monthRows";
+import {
+  exhaustedLeaveTypeIds,
+  fillMonth,
+  fillWeekday,
+  isDirty,
+  projectBalances,
+  setHours,
+  toggleDay,
+} from "./monthRows";
 
 // Oktober 2026: 1 oktober is een donderdag. Contractwissel op de 15e (8 → 6,4 uur).
 const hours: Record<string, number> = {};
@@ -87,5 +95,29 @@ describe("projectBalances", () => {
     const [projection] = projectBalances(rows, [], [balance]);
     expect(projection.overBooked).toBe(6);
     expect(projection.afterDeadline).toBe(true);
+  });
+});
+
+describe("exhaustedLeaveTypeIds", () => {
+  const balances = [
+    { childId: "c", leaveTypeId: "ov", remainingHours: 6.4 },
+    { childId: "c", leaveTypeId: "gv", remainingHours: 0 },
+    { childId: "d", leaveTypeId: "ov", remainingHours: 0 },
+  ] as Balance[];
+
+  it("is op als het saldo met het verlof op het scherm op 0 komt", () => {
+    expect(exhaustedLeaveTypeIds([], [], balances, "c")).toEqual(new Set(["gv"]));
+    expect(exhaustedLeaveTypeIds([row], [], balances, "c")).toEqual(new Set(["ov", "gv"]));
+  });
+
+  it("geeft opgeslagen uren die je weghaalt weer vrij", () => {
+    const saved: LeaveEntry[] = [{ ...row, id: "1", contractId: "b", note: null }];
+    const used = [{ childId: "c", leaveTypeId: "ov", remainingHours: 0 }] as Balance[];
+    expect(exhaustedLeaveTypeIds(saved, saved, used, "c").has("ov")).toBe(true);
+    expect(exhaustedLeaveTypeIds([], saved, used, "c").has("ov")).toBe(false);
+  });
+
+  it("kijkt alleen naar het gekozen kind", () => {
+    expect(exhaustedLeaveTypeIds([], [], balances, "d")).toEqual(new Set(["ov"]));
   });
 });

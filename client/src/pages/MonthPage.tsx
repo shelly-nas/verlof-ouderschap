@@ -59,6 +59,7 @@ import {
   addRow,
   fillMonth,
   fillWeekday,
+  exhaustedLeaveTypeIds,
   isDirty,
   projectBalances,
   rowKey,
@@ -77,12 +78,27 @@ const WEEKDAY_BUTTONS = [
   { day: 5, label: "vr", name: "vrijdag" },
 ];
 
-/** Keuzechip voor een verlofsoort: kleur plus vinkje en ring als hij gekozen is. */
-function LeaveTypeChip({ type, selected, onSelect }: { type: LeaveType; selected: boolean; onSelect: () => void }) {
-  return (
+/**
+ * Keuzechip voor een verlofsoort: kleur plus vinkje en ring als hij gekozen is.
+ * Is het saldo op, dan is hij grijs en niet te kiezen.
+ */
+function LeaveTypeChip({
+  type,
+  selected,
+  exhausted,
+  onSelect,
+}: {
+  type: LeaveType;
+  selected: boolean;
+  exhausted: boolean;
+  onSelect: () => void;
+}) {
+  const chip = (
     <ButtonBase
       onClick={onSelect}
+      disabled={exhausted}
       aria-pressed={selected}
+      aria-label={exhausted ? `${type.name}: saldo op` : undefined}
       sx={(theme) => ({
         minHeight: 44,
         px: 4,
@@ -97,11 +113,31 @@ function LeaveTypeChip({ type, selected, onSelect }: { type: LeaveType; selected
         transition: "border-color .15s ease, background-color .15s ease",
         "&:hover": { borderColor: selected ? theme.palette.primary.main : theme.palette.text.secondary },
         "&.Mui-focusVisible": { boxShadow: `0 0 0 2px ${theme.palette.background.paper}, 0 0 0 4px ${theme.palette.primary.main}` },
+        "&.Mui-disabled": {
+          borderColor: theme.palette.divider,
+          boxShadow: "none",
+          bgcolor: theme.palette.action.disabledBackground,
+          color: theme.palette.text.disabled,
+        },
       })}
     >
-      {selected ? <CheckRounded sx={{ fontSize: 18 }} aria-hidden /> : <ColorDot color={type.colorHex} />}
+      {selected && !exhausted ? (
+        <CheckRounded sx={{ fontSize: 18 }} aria-hidden />
+      ) : (
+        <Box component="span" sx={{ display: "inline-flex", opacity: exhausted ? 0.4 : 1 }}>
+          <ColorDot color={type.colorHex} />
+        </Box>
+      )}
       {type.name}
     </ButtonBase>
+  );
+  // Een uitgeschakelde knop krijgt geen hover; de span erom wel, voor de tooltip.
+  return exhausted ? (
+    <Tooltip title="Saldo is op">
+      <span>{chip}</span>
+    </Tooltip>
+  ) : (
+    chip
   );
 }
 
@@ -111,6 +147,7 @@ function DayDialog({
   rows,
   data,
   activeChildId,
+  exhausted,
   fullDayHours,
   onChangeHours,
   onRemove,
@@ -121,6 +158,7 @@ function DayDialog({
   rows: Row[];
   data: MonthResponse;
   activeChildId: string;
+  exhausted: Set<string>;
   fullDayHours: number;
   onChangeHours: (row: Row, hours: number) => void;
   onRemove: (row: Row) => void;
@@ -204,8 +242,15 @@ function DayDialog({
             </Typography>
             <Box sx={{ display: "flex", flexWrap: "wrap", gap: 2 }}>
               {available.map((type) => (
-                <Button key={type.id} variant="outlined" startIcon={<AddRounded />} onClick={() => onAdd(type.id)}>
+                <Button
+                  key={type.id}
+                  variant="outlined"
+                  startIcon={<AddRounded />}
+                  disabled={exhausted.has(type.id)}
+                  onClick={() => onAdd(type.id)}
+                >
                   {type.name}
+                  {exhausted.has(type.id) && " · saldo op"}
                 </Button>
               ))}
             </Box>
@@ -242,8 +287,12 @@ function MonthEditor({ data, reload }: { data: MonthResponse; reload: () => void
   const { month } = data;
 
   const [rows, setRows] = useState<Row[]>(() => rowsFromEntries(data.entries));
-  const [activeLeaveTypeId, setActiveLeaveTypeId] = useState(data.leaveTypes[0]?.id ?? "");
   const [activeChildId, setActiveChildId] = useState(data.children[0]?.id ?? "");
+  // Begin bij de eerste verlofsoort waar nog saldo van is.
+  const [activeLeaveTypeId, setActiveLeaveTypeId] = useState(() => {
+    const initiallyExhausted = exhaustedLeaveTypeIds(data.entries, data.entries, data.balances, data.children[0]?.id ?? "");
+    return (data.leaveTypes.find((type) => !initiallyExhausted.has(type.id)) ?? data.leaveTypes[0])?.id ?? "";
+  });
   const [selectedDay, setSelectedDay] = useState<DateOnly | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
@@ -271,17 +320,26 @@ function MonthEditor({ data, reload }: { data: MonthResponse; reload: () => void
   const onToggle = useCallback(
     (date: DateOnly) => {
       if (!activeLeaveTypeId || !activeChildId) return;
-      setRows((current) =>
-        toggleDay(current, {
+      setRows((current) => {
+        const target = {
           date,
           childId: activeChildId,
           leaveTypeId: activeLeaveTypeId,
           hours: data.hoursPerWorkdayByDate[date] ?? 8,
-        }),
-      );
+        };
+        // Weghalen mag altijd; neerzetten alleen zolang er saldo is.
+        const present = current.some((row) => rowKey(row) === rowKey(target));
+        if (!present && exhaustedLeaveTypeIds(current, data.entries, data.balances, activeChildId).has(activeLeaveTypeId)) {
+          return current;
+        }
+        return toggleDay(current, target);
+      });
     },
-    [activeChildId, activeLeaveTypeId, data.hoursPerWorkdayByDate],
+    [activeChildId, activeLeaveTypeId, data.hoursPerWorkdayByDate, data.entries, data.balances],
   );
+
+  const exhausted = exhaustedLeaveTypeIds(rows, data.entries, data.balances, activeChildId);
+  const activeExhausted = exhausted.has(activeLeaveTypeId);
 
   const totalHours = rows.reduce((sum, row) => sum + row.hours, 0);
   const projections = projectBalances(rows, data.entries, data.balances);
@@ -397,6 +455,7 @@ function MonthEditor({ data, reload }: { data: MonthResponse; reload: () => void
                         key={type.id}
                         type={type}
                         selected={type.id === activeLeaveTypeId}
+                        exhausted={exhausted.has(type.id)}
                         onSelect={() => setActiveLeaveTypeId(type.id)}
                       />
                     ))}
@@ -423,6 +482,7 @@ function MonthEditor({ data, reload }: { data: MonthResponse; reload: () => void
                 <Button
                   variant="outlined"
                   size="small"
+                  disabled={activeExhausted}
                   onClick={() =>
                     setRows(fillMonth(data.hoursPerWorkdayByDate, month, activeChildId, activeLeaveTypeId))
                   }
@@ -439,6 +499,7 @@ function MonthEditor({ data, reload }: { data: MonthResponse; reload: () => void
                         variant="outlined"
                         size="small"
                         sx={{ minWidth: 40, px: 2 }}
+                        disabled={activeExhausted}
                         aria-label={`Elke ${item.name} vullen`}
                         onClick={() =>
                           setRows((current) =>
@@ -547,6 +608,7 @@ function MonthEditor({ data, reload }: { data: MonthResponse; reload: () => void
         rows={selectedDay ? (rowsByDate.get(selectedDay) ?? []) : []}
         data={data}
         activeChildId={activeChildId}
+        exhausted={exhausted}
         fullDayHours={selectedDay ? fullDayHours(selectedDay) : 8}
         onChangeHours={(row, hours) => setRows((current) => setHours(current, row, hours))}
         onRemove={(row) => setRows((current) => setHours(current, row, 0))}
