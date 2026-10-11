@@ -93,6 +93,37 @@ export function fillWeekday(
   return [...others, ...matching];
 }
 
+function hoursByBalance(items: readonly { childId: string; leaveTypeId: string; hours: number }[]): Map<string, number> {
+  const map = new Map<string, number>();
+  for (const item of items) {
+    const key = balanceKey(item.childId, item.leaveTypeId);
+    map.set(key, (map.get(key) ?? 0) + item.hours);
+  }
+  return map;
+}
+
+/**
+ * Verlofsoorten waarvan het recht van dit kind op is, met het verlof zoals het
+ * nu op het scherm staat. Die kun je niet meer neerzetten, wel weghalen.
+ */
+export function exhaustedLeaveTypeIds(
+  rows: readonly Row[],
+  saved: readonly LeaveEntry[],
+  balances: readonly Balance[],
+  childId: string,
+): Set<string> {
+  const pending = hoursByBalance(rows);
+  const alreadySaved = hoursByBalance(saved);
+  const result = new Set<string>();
+  for (const balance of balances) {
+    if (balance.childId !== childId) continue;
+    const key = balanceKey(balance.childId, balance.leaveTypeId);
+    const remaining = roundHours(balance.remainingHours - ((pending.get(key) ?? 0) - (alreadySaved.get(key) ?? 0)));
+    if (remaining <= 0) result.add(balance.leaveTypeId);
+  }
+  return result;
+}
+
 export type Projection = {
   key: string;
   balance: Balance;
@@ -112,16 +143,8 @@ export function projectBalances(
   saved: readonly LeaveEntry[],
   balances: readonly Balance[],
 ): Projection[] {
-  const sum = (items: readonly { childId: string; leaveTypeId: string; hours: number }[]) => {
-    const map = new Map<string, number>();
-    for (const item of items) {
-      const key = balanceKey(item.childId, item.leaveTypeId);
-      map.set(key, (map.get(key) ?? 0) + item.hours);
-    }
-    return map;
-  };
-  const pending = sum(rows);
-  const alreadySaved = sum(saved);
+  const pending = hoursByBalance(rows);
+  const alreadySaved = hoursByBalance(saved);
   const lookup = new Map(balances.map((balance) => [balanceKey(balance.childId, balance.leaveTypeId), balance]));
 
   const result: Projection[] = [];
