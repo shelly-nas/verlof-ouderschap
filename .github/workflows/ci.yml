@@ -17,7 +17,7 @@ concurrency:
 jobs:
   ci:
     name: CI
-    uses: shelly-nas/shared-workflows/.github/workflows/ci-node-postgres.yml@claude/coverage
+    uses: shelly-nas/shared-workflows/.github/workflows/ci-node-postgres.yml@main
     with:
       db_user: verlof
       db_name: verlof
