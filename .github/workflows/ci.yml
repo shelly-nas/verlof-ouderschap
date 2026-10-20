@@ -27,6 +27,6 @@ jobs:
       migrate_command: >-
         node -e "require('./dist/migrations').runMigrations().then(() => process.exit(0)).catch((e) => { console.error(e); process.exit(1); })"
       # Coverage minimum in %, grown towards the 80% standard (skill `testen`).
-      client_coverage_threshold: '0'
-      server_coverage_threshold: '0'
+      client_coverage_threshold: '5'
+      server_coverage_threshold: '73'
       server_coverage_exclude: 'dist/**/*.test.js,dist/test/**'
